@@ -44,7 +44,7 @@ export const config = {
   },
 
   // Frontend URL
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4444',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 
   auth: {
     publicApiUrl: process.env.PUBLIC_API_URL || process.env.SERVER_PUBLIC_URL || `http://localhost:${defaultPort}`,

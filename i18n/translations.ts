@@ -72,6 +72,7 @@ const enTranslations: TranslationBundle = {
     needCredits: 'Need {count} more credits',
     creditsUnavailable: 'Credits are unavailable',
     moreOptions: 'More options',
+    draftLyrics: 'Draft lyrics',
     
     // Placeholders
     searchPlaceholder: 'Search...',
@@ -2499,6 +2500,7 @@ export const translations: Record<string, TranslationBundle> = {
     needCredits: 'Chýba {count} kreditov',
     creditsUnavailable: 'Kredity nie sú dostupné',
     moreOptions: 'Viac možností',
+    draftLyrics: 'Navrhnúť text',
     searchPlaceholder: 'Hľadať...',
     language: 'Jazyk',
     english: 'Angličtina',

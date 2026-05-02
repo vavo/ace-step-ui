@@ -97,6 +97,60 @@ export function awardBadge(userId: string, badgeKey: BadgeKey, metadata?: Record
   ).run(userId, badgeKey, metadata ? JSON.stringify(metadata) : null);
 }
 
+function refreshWeeklyTopCreatorBadges(periodStart = getWeekStart()): void {
+  const rows = db.prepare(
+    `WITH weekly_songs AS (
+       SELECT user_id,
+              COUNT(*) as published_song_count,
+              COALESCE(SUM(like_count), 0) as likes_received
+       FROM songs
+       WHERE is_public = 1 AND created_at >= ?
+       GROUP BY user_id
+     ),
+     weekly_followers AS (
+       SELECT following_id as user_id,
+              COUNT(*) as follower_growth
+       FROM followers
+       WHERE created_at >= ?
+       GROUP BY following_id
+     ),
+     weekly_events AS (
+       SELECT user_id,
+              COALESCE(SUM(points), 0) as event_points
+       FROM leaderboard_events
+       WHERE period_start = ?
+       GROUP BY user_id
+     )
+     SELECT u.id,
+            (
+              COALESCE(ws.published_song_count, 0) * 20
+              + COALESCE(ws.likes_received, 0) * 5
+              + COALESCE(wf.follower_growth, 0) * 10
+              + COALESCE(we.event_points, 0)
+            ) as leaderboard_score
+     FROM users u
+     LEFT JOIN weekly_songs ws ON ws.user_id = u.id
+     LEFT JOIN weekly_followers wf ON wf.user_id = u.id
+     LEFT JOIN weekly_events we ON we.user_id = u.id
+     WHERE COALESCE(ws.published_song_count, 0) > 0
+        OR COALESCE(ws.likes_received, 0) > 0
+        OR COALESCE(wf.follower_growth, 0) > 0
+        OR COALESCE(we.event_points, 0) > 0
+     ORDER BY leaderboard_score DESC
+     LIMIT 10`
+  ).all(periodStart, periodStart, periodStart) as Array<{ id: string; leaderboard_score: number }>;
+
+  rows.forEach((row, index) => {
+    if ((row.leaderboard_score ?? 0) > 0) {
+      awardBadge(row.id, 'weekly_top_10', {
+        periodStart,
+        rank: index + 1,
+        leaderboardScore: row.leaderboard_score,
+      });
+    }
+  });
+}
+
 export function getUserBadges(userId: string): Array<BadgeDefinition & {
   badge_key: BadgeKey;
   awarded_at: string;
@@ -137,6 +191,7 @@ function recordLeaderboardEvent(params: {
   points: number;
   metadata?: Record<string, unknown>;
 }): void {
+  const periodStart = getWeekStart();
   db.prepare(
     `INSERT INTO leaderboard_events
        (id, user_id, song_id, event_type, points, period_start, metadata, created_at)
@@ -147,9 +202,10 @@ function recordLeaderboardEvent(params: {
     params.songId ?? null,
     params.eventType,
     params.points,
-    getWeekStart(),
+    periodStart,
     params.metadata ? JSON.stringify(params.metadata) : null
   );
+  refreshWeeklyTopCreatorBadges(periodStart);
 }
 
 export function recordPublishedSong(userId: string, songId: string): void {

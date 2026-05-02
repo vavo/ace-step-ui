@@ -70,6 +70,15 @@ const TRACK_NAMES = [
   'keyboard', 'guitar', 'bass', 'drums', 'backing_vocals', 'vocals',
 ];
 
+function clampInt(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+function readStoredInt(key: string, fallback: number, min: number, max: number): number {
+  return clampInt(localStorage.getItem(key), fallback, min, max);
+}
 
 export const CreatePanel: React.FC<CreatePanelProps> = ({
   onGenerate,
@@ -124,12 +133,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [duration, setDuration] = useState(-1);
   const [batchSize, setBatchSize] = useState(() => {
-    const stored = localStorage.getItem('ace-batchSize');
-    return stored ? Number(stored) : 1;
+    return readStoredInt('ace-batchSize', 1, 1, 4);
   });
   const [bulkCount, setBulkCount] = useState(() => {
-    const stored = localStorage.getItem('ace-bulkCount');
-    return stored ? Number(stored) : 1;
+    return readStoredInt('ace-bulkCount', 1, 1, 10);
   });
   const [creditInfo, setCreditInfo] = useState<CreditInfo | null>(null);
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
@@ -1058,7 +1065,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     }
   };
 
-  const generationCreditCost = Math.max(1, batchSize) * Math.max(1, bulkCount) * (creditInfo?.costs.generationVariation ?? 20);
+  const safeBatchSize = clampInt(batchSize, 1, 1, 4);
+  const safeBulkCount = clampInt(bulkCount, 1, 1, 10);
+  const generationCreditCost = safeBatchSize * safeBulkCount * (creditInfo?.costs.generationVariation ?? 20);
   const hasEnoughCredits = !creditInfo || creditInfo.balance >= generationCreditCost;
 
   const handleGenerate = () => {
@@ -1075,7 +1084,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     })();
 
     // Bulk generation: loop bulkCount times
-    for (let i = 0; i < bulkCount; i++) {
+    for (let i = 0; i < safeBulkCount; i++) {
       // Seed handling: first job uses user's seed, rest get random seeds
       let jobSeed = -1;
       if (!randomSeed && i === 0) {
@@ -1091,7 +1100,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         prompt: lyrics,
         lyrics,
         style: styleWithGender,
-        title: bulkCount > 1 ? `${title} (${i + 1})` : title,
+        title: safeBulkCount > 1 ? `${title} (${i + 1})` : title,
         ditModel: selectedModel,
         instrumental,
         vocalLanguage,
@@ -1101,7 +1110,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         duration,
         inferenceSteps,
         guidanceScale,
-        batchSize,
+        batchSize: safeBatchSize,
         randomSeed: randomSeed || i > 0, // Force random for subsequent bulk jobs
         seed: jobSeed,
         thinking,
@@ -1154,8 +1163,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     }
 
     // Reset bulk count after generation
-    if (bulkCount > 1) {
+    if (safeBulkCount > 1) {
       setBulkCount(1);
+      localStorage.setItem('ace-bulkCount', '1');
     }
   };
 
@@ -1317,24 +1327,35 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <span className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                   {t('describeYourSong')}
                 </span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!token) return;
-                    try {
-                      const result = await generateApi.getRandomDescription(token);
-                      setSongDescription(result.description);
-                      setInstrumental(result.instrumental);
-                      updateVocalLanguage(result.vocalLanguage || 'unknown');
-                    } catch (err) {
-                      console.error('Failed to load random description:', err);
-                    }
-                  }}
-                  title="Load random description"
-                  className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
-                >
-                  <Dices size={14} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleDraftLyrics}
+                    disabled={isDraftingLyrics || !songDescription.trim()}
+                    title={t('draftLyrics')}
+                    className="p-1 rounded-md text-zinc-400 hover:text-pink-500 dark:hover:text-pink-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors disabled:opacity-40 disabled:hover:text-zinc-400"
+                  >
+                    {isDraftingLyrics ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!token) return;
+                      try {
+                        const result = await generateApi.getRandomDescription(token);
+                        setSongDescription(result.description);
+                        setInstrumental(result.instrumental);
+                        updateVocalLanguage(result.vocalLanguage || 'unknown');
+                      } catch (err) {
+                        console.error('Failed to load random description:', err);
+                      }
+                    }}
+                    title="Load random description"
+                    className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
+                  >
+                    <Dices size={14} />
+                  </button>
+                </div>
               </div>
               <textarea
                 value={songDescription}
@@ -1452,20 +1473,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 min={1}
                 max={4}
                 step={1}
-                onChange={setBatchSize}
+                onChange={(value) => {
+                  const next = clampInt(value, 1, 1, 4);
+                  setBatchSize(next);
+                  localStorage.setItem('ace-batchSize', String(next));
+                }}
               />
-              <div style={{display: 'none'}}>
-                <input
-                  type="range"
-                  min="1"
-                  max="4"
-                  step="1"
-                  value={batchSize}
-                  onChange={setBatchSize}
-                  className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
-                />
-                <p className="text-[10px] text-zinc-500">{t('numberOfVariations')}</p>
-              </div>
             </div>
           </div>
         )}
@@ -2029,7 +2042,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               min={1}
               max={4}
               step={1}
-              onChange={setBatchSize}
+              onChange={(value) => {
+                const next = clampInt(value, 1, 1, 4);
+                setBatchSize(next);
+                localStorage.setItem('ace-batchSize', String(next));
+              }}
               helpText={t('numberOfVariations')}
               title="Creates multiple variations in a single run. More variations = longer total time."
             />
@@ -2046,7 +2063,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 {[1, 2, 3, 5, 10].map((count) => (
                   <button
                     key={count}
-                    onClick={() => { setBulkCount(count); localStorage.setItem('ace-bulkCount', String(count)); }}
+                    onClick={() => {
+                      const next = clampInt(count, 1, 1, 10);
+                      setBulkCount(next);
+                      localStorage.setItem('ace-bulkCount', String(next));
+                    }}
                     className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                       bulkCount === count
                         ? 'bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-md'

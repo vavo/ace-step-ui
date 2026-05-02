@@ -34,7 +34,7 @@ type GoogleProfile = {
 };
 
 function isLocalAuthAllowed(): boolean {
-  return config.nodeEnv !== 'production' || !config.auth.googleClientId || !config.auth.googleClientSecret;
+  return config.nodeEnv !== 'production';
 }
 
 function getPublicApiUrl(): string {

@@ -3,7 +3,7 @@ import { pool } from '../db/pool.js';
 import { generateUUID } from '../db/sqlite.js';
 import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
-import { awardBadge, getUserBadges, getWeekStart } from '../services/gamification.js';
+import { getUserBadges, getWeekStart } from '../services/gamification.js';
 import { checkRateLimit } from '../services/rateLimit.js';
 
 const router = Router();
@@ -210,9 +210,6 @@ router.get('/leaderboards', optionalAuthMiddleware, async (req: AuthenticatedReq
     const creators = creatorResult.rows.map((row, index) => {
       const rank = index + 1;
       const leaderboardScore = row.leaderboard_score ?? 0;
-      if (rank <= 10 && leaderboardScore > 0) {
-        awardBadge(row.id, 'weekly_top_10', { periodStart, rank, leaderboardScore });
-      }
 
       return {
         id: row.id,
