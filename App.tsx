@@ -24,6 +24,7 @@ import { SearchPage } from './components/SearchPage';
 import { TrainingPanel } from './components/TrainingPanel';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { FeedPage } from './components/FeedPage';
+import { LeaderboardPage } from './components/LeaderboardPage';
 
 
 function AppContent() {
@@ -278,6 +279,8 @@ function AppContent() {
         setCurrentView('library');
       } else if (path === '/feed') {
         setCurrentView('feed');
+      } else if (path === '/leaderboard') {
+        setCurrentView('leaderboard');
       } else if (path.startsWith('/@')) {
         const username = path.substring(2);
         if (username) {
@@ -1316,6 +1319,17 @@ function AppContent() {
           />
         );
 
+      case 'leaderboard':
+        return (
+          <LeaderboardPage
+            onPlaySong={playSong}
+            currentSong={currentSong}
+            isPlaying={isPlaying}
+            onNavigateToProfile={handleNavigateToProfile}
+            onNavigateToSong={handleNavigateToSong}
+          />
+        );
+
       case 'training':
         return <TrainingPanel />;
 
@@ -1421,6 +1435,8 @@ function AppContent() {
               window.history.pushState({}, '', '/library');
             } else if (v === 'feed') {
               window.history.pushState({}, '', '/feed');
+            } else if (v === 'leaderboard') {
+              window.history.pushState({}, '', '/leaderboard');
             } else if (v === 'search') {
               window.history.pushState({}, '', '/search');
             }
