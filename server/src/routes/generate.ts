@@ -63,6 +63,16 @@ type RandomDescriptionResult = {
   error?: string;
 };
 
+const DEFAULT_GENERATION_LIMITS = {
+  tier: 'unknown',
+  gpu_memory_gb: 0,
+  max_duration_with_lm: 240,
+  max_duration_without_lm: 240,
+  max_batch_size_with_lm: 1,
+  max_batch_size_without_lm: 4,
+  fallback: true,
+};
+
 const RANDOM_DESCRIPTION_FALLBACKS = [
   'A mellow lo-fi chill track with soft piano chords and warm ambient pads.',
   'An energetic 80s-inspired synthwave song with nostalgic arpeggios and punchy drums.',
@@ -1148,11 +1158,17 @@ router.get('/limits', async (_req, res: Response) => {
     if (result.success && result.data) {
       res.json(result.data);
     } else {
-      res.status(500).json({ error: result.error || 'Failed to load limits' });
+      res.json({
+        ...DEFAULT_GENERATION_LIMITS,
+        error: result.error || 'Failed to load limits',
+      });
     }
   } catch (error) {
     console.error('Limits error:', error);
-    res.status(500).json({ error: (error as Error).message });
+    res.json({
+      ...DEFAULT_GENERATION_LIMITS,
+      error: (error as Error).message,
+    });
   }
 });
 
