@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../db/pool.js';
 import { generateUUID } from '../db/sqlite.js';
 import { config } from '../config/index.js';
-import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
+import { authMiddleware, AuthenticatedRequest, optionalAuthMiddleware } from '../middleware/auth.js';
 import {
   authResponse,
   buildUserPayload,
@@ -320,6 +320,37 @@ router.get('/google/callback', async (req: Request, res: Response) => {
 });
 
 // Get current user
+router.get('/session', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      res.json({ authenticated: false, user: null, token: null });
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT ${userSelectFields} FROM users WHERE id = ?`,
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      res.json({ authenticated: false, user: null, token: null });
+      return;
+    }
+
+    const user = result.rows[0];
+    const token = issueAccessToken({
+      id: user.id,
+      username: user.username,
+      isAdmin: Boolean(user.is_admin),
+    });
+
+    res.json({ authenticated: true, user: buildUserPayload(user), token });
+  } catch (error) {
+    console.error('Get session error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = await pool.query(

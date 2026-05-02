@@ -97,6 +97,12 @@ export interface AuthResponse {
   token: string;
 }
 
+export interface SessionResponse {
+  authenticated: boolean;
+  user: User | null;
+  token: string | null;
+}
+
 export const authApi = {
   googleStartUrl: '/api/auth/google/start',
 
@@ -111,6 +117,9 @@ export const authApi = {
 
   me: (token?: string | null): Promise<AuthResponse> =>
     api('/api/auth/me', { token: token || undefined }),
+
+  session: (): Promise<SessionResponse> =>
+    api('/api/auth/session'),
 
   logout: (): Promise<{ success: boolean }> =>
     api('/api/auth/logout', { method: 'POST' }),

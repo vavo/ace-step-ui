@@ -15,8 +15,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = 'acestep_token';
-const USER_KEY = 'acestep_user';
+const LEGACY_TOKEN_KEY = 'acestep_token';
+const LEGACY_USER_KEY = 'acestep_user';
 
 export function AuthProvider({ children }: { children: ReactNode }): React.ReactElement {
   // Start with null - we'll auto-login from database on mount
@@ -30,18 +30,24 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   useEffect(() => {
     async function initAuth(): Promise<void> {
       try {
-        const storedToken = localStorage.getItem(TOKEN_KEY);
-        const { user: userData, token: newToken } = await authApi.me(storedToken);
+        localStorage.removeItem(LEGACY_TOKEN_KEY);
+        localStorage.removeItem(LEGACY_USER_KEY);
+
+        const { authenticated, user: userData, token: newToken } = await authApi.session();
+        if (!authenticated || !userData || !newToken) {
+          setToken(null);
+          setUser(null);
+          return;
+        }
+
         setUser(userData);
         setToken(newToken);
-        localStorage.setItem(TOKEN_KEY, newToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(userData));
       } catch (error: unknown) {
-        console.warn('Session restore failed:', error);
         setToken(null);
         setUser(null);
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
+        if (error instanceof Error && !error.message.startsWith('401:')) {
+          console.warn('Session restore failed:', error);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -54,8 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     const { user: userData, token: newToken } = await authApi.setup(username);
     setUser(userData);
     setToken(newToken);
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
   }, []);
 
   const startGoogleLogin = useCallback((): void => {
@@ -67,16 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     const { user: userData, token: newToken } = await authApi.updateUsername(username, token);
     setUser(userData);
     setToken(newToken);
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
   }, [token]);
 
   const logout = useCallback((): void => {
     authApi.logout().catch(() => {});
     setUser(null);
     setToken(null);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+    localStorage.removeItem(LEGACY_USER_KEY);
   }, []);
 
   const refreshUser = useCallback(async (): Promise<void> => {
@@ -84,8 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
       const { user: userData, token: newToken } = await authApi.me(token);
       setUser(userData);
       setToken(newToken);
-      localStorage.setItem(TOKEN_KEY, newToken);
-      localStorage.setItem(USER_KEY, JSON.stringify(userData));
     } catch (error) {
       console.error('Failed to refresh user:', error);
     }
