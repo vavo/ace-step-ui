@@ -8,10 +8,10 @@ import { getStorageProvider } from '../services/storage/factory.js';
 const router = Router();
 const userSelectFields = 'id, username, created_at, bio, avatar_url, banner_url, default_vocal_language, default_ui_language';
 
-function getValidUiLanguage(language: unknown): string {
-  if (typeof language !== 'string') return 'sk';
+function getValidUiLanguage(language: unknown): string | null {
+  if (typeof language !== 'string') return null;
   const normalized = language.toLowerCase();
-  return ['en', 'zh', 'ja', 'ko', 'sk'].includes(normalized) ? normalized : 'sk';
+  return ['en', 'zh', 'ja', 'ko', 'sk'].includes(normalized) ? normalized : null;
 }
 
 function getValidVocalLanguage(language: unknown): string | null {
@@ -302,9 +302,13 @@ router.patch('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respo
             paramCount++;
         }
 
-        const resolvedDefaultUiLanguage = getValidUiLanguage(defaultUiLanguage ?? default_ui_language);
         const hasUiLanguageInput = req.body.defaultUiLanguage !== undefined || req.body.default_ui_language !== undefined;
-        if (resolvedDefaultUiLanguage && hasUiLanguageInput) {
+        if (hasUiLanguageInput) {
+            const resolvedDefaultUiLanguage = getValidUiLanguage(defaultUiLanguage ?? default_ui_language);
+            if (resolvedDefaultUiLanguage === null) {
+                res.status(400).json({ error: 'Invalid default UI language' });
+                return;
+            }
             updates.push(`default_ui_language = $${paramCount}`);
             values.push(resolvedDefaultUiLanguage);
             paramCount++;

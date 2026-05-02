@@ -84,13 +84,18 @@ app.use('/acestep-api', createProxyMiddleware({
   target: config.acestep.apiUrl,
   changeOrigin: true,
   pathRewrite: { '^/acestep-api': '' },
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`[Proxy] ${req.method} ${req.url} -> ${config.acestep.apiUrl}${req.url.replace('/acestep-api', '')}`);
+  on: {
+    proxyReq: (_proxyReq, req) => {
+      console.log(`[Proxy] ${req.method} ${req.url} -> ${config.acestep.apiUrl}${req.url?.replace('/acestep-api', '')}`);
+    },
+    error: (err, _req, res) => {
+      console.error('[Proxy Error]', err);
+      if ('writeHead' in res) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'ACE-Step API proxy error' }));
+      }
+    },
   },
-  onError: (err, req, res) => {
-    console.error('[Proxy Error]', err);
-    res.status(500).json({ error: 'ACE-Step API proxy error' });
-  }
 }));
 
 // Serve static audio files

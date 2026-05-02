@@ -94,6 +94,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // Common
   const [instrumental, setInstrumental] = useState(false);
   const [vocalLanguage, setVocalLanguage] = useState('en');
+  const vocalLanguageTouchedRef = useRef(false);
+  const updateVocalLanguage = useCallback((language: string, markTouched = true) => {
+    if (markTouched) vocalLanguageTouchedRef.current = true;
+    setVocalLanguage(language);
+  }, []);
   const [vocalGender, setVocalGender] = useState<'male' | 'female' | ''>('');
 
   // Music Parameters
@@ -404,7 +409,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         if (data.title !== undefined) setTitle(data.title);
         if (data.caption !== undefined) setStyle(data.caption);
         if (data.instrumental !== undefined) setInstrumental(data.instrumental);
-        if (data.vocal_language !== undefined) setVocalLanguage(data.vocal_language);
+        if (data.vocal_language !== undefined) updateVocalLanguage(data.vocal_language);
         if (data.bpm !== undefined) setBpm(data.bpm);
         if (data.key_scale !== undefined) setKeyScale(data.key_scale);
         if (data.time_signature !== undefined) setTimeSignature(data.time_signature);
@@ -446,9 +451,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   }, [initialData]);
 
   useEffect(() => {
+    vocalLanguageTouchedRef.current = false;
+  }, [user?.id]);
+
+  useEffect(() => {
     if (!user?.default_vocal_language) return;
-    setVocalLanguage(user.default_vocal_language);
-  }, [user?.default_vocal_language]);
+    if (vocalLanguageTouchedRef.current) return;
+    updateVocalLanguage(user.default_vocal_language, false);
+  }, [user?.default_vocal_language, updateVocalLanguage]);
 
   useEffect(() => {
     if (!pendingAudioSelection) return;
@@ -690,7 +700,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
           const ts = String(result.time_signature);
           setTimeSignature(ts.includes('/') ? ts : `${ts}/4`);
         }
-        if (result.vocal_language) setVocalLanguage(result.vocal_language);
+        if (result.vocal_language) updateVocalLanguage(result.vocal_language);
         if (target === 'style') setIsFormatCaption(true);
       } else {
         console.error('Format failed:', result.error || result.status_message);
@@ -1193,7 +1203,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                       const result = await generateApi.getRandomDescription(token);
                       setSongDescription(result.description);
                       setInstrumental(result.instrumental);
-                      setVocalLanguage(result.vocalLanguage || 'unknown');
+                      updateVocalLanguage(result.vocalLanguage || 'unknown');
                     } catch (err) {
                       console.error('Failed to load random description:', err);
                     }
@@ -1220,7 +1230,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </label>
                 <select
                   value={vocalLanguage}
-                  onChange={(e) => setVocalLanguage(e.target.value)}
+                  onChange={(e) => updateVocalLanguage(e.target.value)}
                   className="w-full bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/5 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   {VOCAL_LANGUAGE_KEYS.map(lang => (
@@ -1676,7 +1686,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </label>
                 <select
                   value={vocalLanguage}
-                  onChange={(e) => setVocalLanguage(e.target.value)}
+                  onChange={(e) => updateVocalLanguage(e.target.value)}
                   className="w-full bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/5 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-pink-500 dark:focus:border-pink-500 transition-colors cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800 [&>option]:text-zinc-900 [&>option]:dark:text-white"
                 >
                   {VOCAL_LANGUAGE_KEYS.map(lang => (

@@ -47,6 +47,14 @@ type GeminiFormatResult = {
 
 type FormatProvider = 'openai' | 'gemini';
 
+type RandomDescriptionResult = {
+  description: string;
+  instrumental: boolean;
+  vocalLanguage: string;
+  fallback: boolean;
+  error?: string;
+};
+
 const RANDOM_DESCRIPTION_FALLBACKS = [
   'A mellow lo-fi chill track with soft piano chords and warm ambient pads.',
   'An energetic 80s-inspired synthwave song with nostalgic arpeggios and punchy drums.',
@@ -65,7 +73,7 @@ function getRandomDescriptionFallback() {
   };
 }
 
-async function resolveGradioRandomDescription() {
+async function resolveGradioRandomDescription(): Promise<RandomDescriptionResult> {
   const fallback = getRandomDescriptionFallback();
   const errorPrefix = 'Random description unavailable. Falling back to built-in suggestions.';
 

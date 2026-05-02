@@ -6,6 +6,7 @@ import { promises as fs } from 'fs';
 import { pool } from '../db/pool.js';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
+import { config } from '../config/index.js';
 import { spawn } from 'child_process';
 
 const router = Router();
@@ -267,7 +268,7 @@ router.post('/:id/transcribe', authMiddleware, async (req: AuthenticatedRequest,
       return;
     }
 
-    const audioPath = path.join(AUDIO_DIR, result.rows[0].storage_key);
+    const audioPath = path.join(config.storage.audioDir, result.rows[0].storage_key);
     const buffer = await fs.readFile(audioPath);
     const controller = new AbortController();
 
