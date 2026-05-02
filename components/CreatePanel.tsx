@@ -3,7 +3,7 @@ import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash,
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { generateApi } from '../services/api';
+import { generateApi, lyricsApi } from '../services/api';
 import { MAIN_STYLES } from '../data/genres';
 import { VOCAL_LANGUAGE_KEYS } from '../data/vocalLanguages';
 import { EditableSlider } from './EditableSlider';
@@ -230,6 +230,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isFormattingStyle, setIsFormattingStyle] = useState(false);
   const [isFormattingLyrics, setIsFormattingLyrics] = useState(false);
+  const [isDraftingLyrics, setIsDraftingLyrics] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [dragKind, setDragKind] = useState<'file' | 'audio' | null>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
@@ -715,6 +716,44 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       } else {
         setIsFormattingLyrics(false);
       }
+    }
+  };
+
+  const handleDraftLyrics = async () => {
+    if (!token) {
+      alert('Please complete the local setup/login before generating lyrics.');
+      return;
+    }
+
+    const prompt = customMode
+      ? [title.trim(), style.trim(), lyrics.trim()].filter(Boolean).join('\n')
+      : songDescription.trim();
+
+    if (!prompt) {
+      alert('Please enter a prompt or style idea before generating lyrics.');
+      return;
+    }
+
+    setIsDraftingLyrics(true);
+    try {
+      const result = await lyricsApi.draft({
+        prompt,
+        style: style.trim(),
+        language: vocalLanguage && vocalLanguage !== 'unknown' ? vocalLanguage : 'sk',
+      }, token);
+
+      setCustomMode(true);
+      setInstrumental(false);
+      setTitle(result.draft.title);
+      setLyrics(result.draft.lyrics);
+      setStyle(result.draft.stylePrompt);
+      updateVocalLanguage(result.draft.language || 'sk');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate lyrics';
+      console.error('Draft lyrics error:', err);
+      alert(message);
+    } finally {
+      setIsDraftingLyrics(false);
     }
   };
 
@@ -1548,12 +1587,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     {instrumental ? t('instrumental') : t('vocal')}
                   </button>
                   <button
-                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormattingLyrics ? 'text-pink-500' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
-                    title="AI Format - Enhance style & auto-fill parameters"
-                    onClick={() => handleFormat('lyrics')}
-                    disabled={isFormattingLyrics || !(style.trim() || lyrics.trim())}
+                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isDraftingLyrics ? 'text-pink-500' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
+                    title="Generate lyrics from your prompt"
+                    onClick={handleDraftLyrics}
+                    disabled={isDraftingLyrics || !(style.trim() || lyrics.trim() || title.trim() || songDescription.trim())}
                   >
-                    {isFormattingLyrics ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                    {isDraftingLyrics ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   </button>
                   <button
                     className="p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded text-zinc-500 hover:text-black dark:hover:text-white transition-colors"
