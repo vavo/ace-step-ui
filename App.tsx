@@ -14,7 +14,6 @@ import { SongProfile } from './components/SongProfile';
 import { Song, GenerationParams, View, Playlist } from './types';
 import { generateApi, songsApi, playlistsApi, getAudioUrl } from './services/api';
 import { useAuth } from './context/AuthContext';
-import { useResponsive } from './context/ResponsiveContext';
 import { I18nProvider, useI18n } from './context/I18nContext';
 import { Language } from './i18n/translations';
 import { List } from 'lucide-react';
@@ -25,14 +24,12 @@ import { TrainingPanel } from './components/TrainingPanel';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { FeedPage } from './components/FeedPage';
 import { LeaderboardPage } from './components/LeaderboardPage';
+import { MobileBottomNav } from './components/MobileBottomNav';
 
 
 function AppContent() {
   // i18n
   const { t, language, setLanguage } = useI18n();
-
-  // Responsive
-  const { isMobile, isDesktop } = useResponsive();
 
   // Auth
   const { user, token, isAuthenticated, isLoading: authLoading, setupUser, startGoogleLogin, logout } = useAuth();
@@ -241,6 +238,37 @@ function AppContent() {
     setViewingSongId(null);
     setCurrentView('create');
     window.history.pushState({}, '', '/');
+  };
+
+  const handleNavigate = useCallback((view: View) => {
+    setCurrentView(view);
+    setShowLeftSidebar(false);
+
+    if (view !== 'profile') setViewingUsername(null);
+    if (view !== 'song') setViewingSongId(null);
+    if (view !== 'playlist') setViewingPlaylistId(null);
+
+    if (view === 'create') {
+      setMobileShowList(false);
+      window.history.pushState({}, '', '/');
+    } else if (view === 'library') {
+      window.history.pushState({}, '', '/library');
+    } else if (view === 'feed') {
+      window.history.pushState({}, '', '/feed');
+    } else if (view === 'leaderboard') {
+      window.history.pushState({}, '', '/leaderboard');
+    } else if (view === 'search') {
+      window.history.pushState({}, '', '/search');
+    }
+  }, []);
+
+  const handleNavigateToOwnProfile = () => {
+    if (user?.username) {
+      handleNavigateToProfile(user.username);
+      setShowLeftSidebar(false);
+    } else {
+      setShowUsernameModal(true);
+    }
   };
 
   // Theme Effect
@@ -1426,22 +1454,7 @@ function AppContent() {
       <div className="flex-1 flex overflow-hidden">
         <Sidebar
           currentView={currentView}
-          onNavigate={(v) => {
-            setCurrentView(v);
-            if (v === 'create') {
-              setMobileShowList(false);
-              window.history.pushState({}, '', '/');
-            } else if (v === 'library') {
-              window.history.pushState({}, '', '/library');
-            } else if (v === 'feed') {
-              window.history.pushState({}, '', '/feed');
-            } else if (v === 'leaderboard') {
-              window.history.pushState({}, '', '/leaderboard');
-            } else if (v === 'search') {
-              window.history.pushState({}, '', '/search');
-            }
-            if (isMobile) setShowLeftSidebar(false);
-          }}
+          onNavigate={handleNavigate}
           theme={theme}
           onToggleTheme={toggleTheme}
           user={user}
@@ -1483,6 +1496,14 @@ function AppContent() {
         onAddToPlaylist={() => currentSong && openAddToPlaylistModal(currentSong)}
         onDelete={() => currentSong && handleDeleteSong(currentSong)}
         onPlayFirst={playFirst}
+      />
+
+      <MobileBottomNav
+        currentView={currentView}
+        user={user}
+        onNavigate={handleNavigate}
+        onProfile={handleNavigateToOwnProfile}
+        onLogin={() => setShowUsernameModal(true)}
       />
 
       <CreatePlaylistModal
