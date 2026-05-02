@@ -1,7 +1,7 @@
 import { writeFile, unlink, stat, mkdir, copyFile } from 'fs/promises';
 import path from 'path';
 import type { StorageProvider } from './index.js';
-import { config } from '../config/index.js';
+import { config } from '../../config/index.js';
 
 export class LocalStorageProvider implements StorageProvider {
   private audioDir: string;
