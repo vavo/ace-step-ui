@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 // Load .env from project root (parent of server directory)
 const __filename_init = fileURLToPath(import.meta.url);
@@ -77,6 +78,20 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Proxy ACE-Step API requests
+app.use('/acestep-api', createProxyMiddleware({
+  target: config.acestep.apiUrl,
+  changeOrigin: true,
+  pathRewrite: { '^/acestep-api': '' },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[Proxy] ${req.method} ${req.url} -> ${config.acestep.apiUrl}${req.url.replace('/acestep-api', '')}`);
+  },
+  onError: (err, req, res) => {
+    console.error('[Proxy Error]', err);
+    res.status(500).json({ error: 'ACE-Step API proxy error' });
+  }
+}));
 
 // Serve static audio files
 app.use('/audio', express.static(path.join(__dirname, '../public/audio')));
@@ -396,6 +411,21 @@ app.get('/api/search', async (req, res) => {
     res.status(500).json({ error: 'Search failed' });
   }
 });
+
+// Serve React frontend (production build)
+if (config.nodeEnv === 'production') {
+  const distPath = path.join(__dirname_init, '../dist');
+  app.use(express.static(distPath));
+
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
+    // Skip API routes and static assets
+    if (req.path.startsWith('/api') || req.path.startsWith('/audio') || req.path.startsWith('/editor') || req.path.startsWith('/demucs-web') || req.path.startsWith('/acestep-api')) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Routes
 app.use('/api/auth', authRoutes);

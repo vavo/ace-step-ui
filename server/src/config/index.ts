@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const config = {
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseInt(process.env.PORT || '4444', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // SQLite database
@@ -27,7 +27,7 @@ export const config = {
   },
 
   // Frontend URL
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4444',
 
   // Storage (local only)
   storage: {
