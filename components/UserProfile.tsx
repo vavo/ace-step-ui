@@ -26,6 +26,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
     const [songsTab, setSongsTab] = useState<'recent' | 'top'>('recent');
     const [loading, setLoading] = useState(true);
     const [showSafetyMenu, setShowSafetyMenu] = useState(false);
+    const [safetyAction, setSafetyAction] = useState<'report' | 'block' | null>(null);
+    const [safetyError, setSafetyError] = useState<string | null>(null);
 
     // Edit State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -49,6 +51,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
 
     const loadUserProfile = async () => {
         setLoading(true);
+        setAvatarFailed(false);
+        setSafetyError(null);
+        setShowSafetyMenu(false);
         try {
             const [profileRes, songsRes, playlistsRes] = await Promise.all([
                 usersApi.getProfile(username, token),
@@ -157,20 +162,38 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
     };
 
     const handleReportUser = async () => {
-        if (!profileUser || !token) return;
-        await socialApi.report({
-            targetType: 'user',
-            targetId: profileUser.id,
-            reason: 'other',
-        }, token);
-        setShowSafetyMenu(false);
+        if (!profileUser || !token || safetyAction) return;
+        setSafetyAction('report');
+        setSafetyError(null);
+        try {
+            await socialApi.report({
+                targetType: 'user',
+                targetId: profileUser.id,
+                reason: 'other',
+            }, token);
+            setShowSafetyMenu(false);
+        } catch (error) {
+            console.error('Failed to report user:', error);
+            setSafetyError(t('reportFailed'));
+        } finally {
+            setSafetyAction(null);
+        }
     };
 
     const handleBlockUser = async () => {
-        if (!profileUser || !token) return;
-        await socialApi.blockUser(profileUser.username, token);
-        setShowSafetyMenu(false);
-        onBack();
+        if (!profileUser || !token || safetyAction) return;
+        setSafetyAction('block');
+        setSafetyError(null);
+        try {
+            await socialApi.blockUser(profileUser.username, token);
+            setShowSafetyMenu(false);
+            onBack();
+        } catch (error) {
+            console.error('Failed to block user:', error);
+            setSafetyError(t('blockFailed'));
+        } finally {
+            setSafetyAction(null);
+        }
     };
 
     if (loading) {
@@ -294,6 +317,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                                     <img
                                         src={profileUser.avatar_url}
                                         alt={profileUser.username}
+                                        decoding="async"
                                         className="w-full h-full object-cover"
                                         referrerPolicy="no-referrer"
                                         onError={() => setAvatarFailed(true)}
@@ -415,18 +439,25 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                                             <div className="absolute right-0 top-12 z-30 w-44 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-xl py-1">
                                                 <button
                                                     onClick={() => void handleReportUser()}
-                                                    className="w-full px-3 py-2 text-left text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center gap-2"
+                                                    disabled={Boolean(safetyAction)}
+                                                    className="w-full px-3 py-2 text-left text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center gap-2 disabled:opacity-60"
                                                 >
-                                                    <AlertTriangle size={14} />
+                                                    {safetyAction === 'report' ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
                                                     {t('reportUser')}
                                                 </button>
                                                 <button
                                                     onClick={() => void handleBlockUser()}
-                                                    className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-300 hover:bg-red-500/10 flex items-center gap-2"
+                                                    disabled={Boolean(safetyAction)}
+                                                    className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-300 hover:bg-red-500/10 flex items-center gap-2 disabled:opacity-60"
                                                 >
-                                                    <Ban size={14} />
+                                                    {safetyAction === 'block' ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
                                                     {t('blockUser')}
                                                 </button>
+                                                {safetyError && (
+                                                    <div className="px-3 py-2 text-xs text-red-600 dark:text-red-300 border-t border-zinc-200 dark:border-white/10">
+                                                        {safetyError}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -483,7 +514,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                                             onClick={() => onPlaySong(song, featuredSongs)}
                                             className="aspect-square rounded-lg overflow-hidden mb-2 md:mb-3 relative bg-zinc-200 dark:bg-zinc-800 cursor-pointer"
                                         >
-                                            <img src={song.coverUrl} alt={song.title} className={`w-full h-full object-cover transition-transform duration-500 ${isCurrentlyPlaying ? 'scale-105' : 'group-hover:scale-105'}`} />
+                                            <img src={song.coverUrl} alt={song.title} loading="lazy" decoding="async" className={`w-full h-full object-cover transition-transform duration-500 ${isCurrentlyPlaying ? 'scale-105' : 'group-hover:scale-105'}`} />
                                             <div className={`absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center ${isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                                                 <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white flex items-center justify-center shadow-lg">
                                                     {isCurrentlyPlaying ? (
@@ -575,7 +606,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                                             onClick={() => onPlaySong(song, displaySongs)}
                                             className="relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-md overflow-hidden bg-zinc-200 dark:bg-zinc-800"
                                         >
-                                            <img src={song.coverUrl} alt={song.title} className="w-full h-full object-cover" />
+                                            <img src={song.coverUrl} alt={song.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                             <div className={`absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center ${isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                                                 {isCurrentlyPlaying ? (
                                                     <Pause size={18} className="text-white fill-white md:w-5 md:h-5" />

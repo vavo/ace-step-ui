@@ -3,7 +3,7 @@ import { Song } from '../types';
 import { songsApi, getAudioUrl, socialApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { ArrowLeft, Play, Pause, Heart, Share2, MoreHorizontal, ThumbsDown, Music as MusicIcon, Edit3, Eye } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Heart, Share2, MoreHorizontal, ThumbsDown, Music as MusicIcon, Edit3, Eye, Loader2 } from 'lucide-react';
 import { ShareModal } from './ShareModal';
 import { SongDropdownMenu } from './SongDropdownMenu';
 
@@ -90,12 +90,16 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
     const [reportSubmitted, setReportSubmitted] = useState(false);
+    const [isReporting, setIsReporting] = useState(false);
+    const [reportError, setReportError] = useState<string | null>(null);
 
     const isCurrentSong = song && currentSong?.id === song.id;
     const isCurrentlyPlaying = isCurrentSong && isPlaying;
     const isLiked = song ? likedSongIds.has(song.id) : false;
 
     useEffect(() => {
+        setReportSubmitted(false);
+        setReportError(null);
         loadSongData();
         return () => resetMetaTags();
     }, [songId]);
@@ -140,13 +144,22 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
     };
 
     const handleReportSong = async () => {
-        if (!song || !token) return;
-        await socialApi.report({
-            targetType: 'song',
-            targetId: song.id,
-            reason: 'other',
-        }, token);
-        setReportSubmitted(true);
+        if (!song || !token || isReporting || reportSubmitted) return;
+        setIsReporting(true);
+        setReportError(null);
+        try {
+            await socialApi.report({
+                targetType: 'song',
+                targetId: song.id,
+                reason: 'other',
+            }, token);
+            setReportSubmitted(true);
+        } catch (error) {
+            console.error('Failed to report song:', error);
+            setReportError(t('reportFailed'));
+        } finally {
+            setIsReporting(false);
+        }
     };
 
     if (loading) {
@@ -193,7 +206,7 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                             >
                                 <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white overflow-hidden">
                                     {song.creator_avatar ? (
-                                        <img src={song.creator_avatar} alt={song.creator || 'Creator'} className="w-full h-full object-cover" />
+                                        <img src={song.creator_avatar} alt={song.creator || 'Creator'} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                     ) : (
                                         song.creator ? song.creator[0].toUpperCase() : 'A'
                                     )}
@@ -242,7 +255,7 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                     <div className="space-y-4 md:space-y-6">
                         {/* Cover Art */}
                         <div className="relative aspect-square max-w-xs md:max-w-sm mx-auto lg:mx-0 rounded-xl overflow-hidden shadow-2xl">
-                            <img src={song.coverUrl} alt={song.title} className={`w-full h-full object-cover transition-transform duration-500 ${isCurrentlyPlaying ? 'scale-105' : ''}`} />
+                            <img src={song.coverUrl} alt={song.title} decoding="async" className={`w-full h-full object-cover transition-transform duration-500 ${isCurrentlyPlaying ? 'scale-105' : ''}`} />
                             <button
                                 onClick={() => onPlay(song)}
                                 className={`absolute inset-0 transition-colors flex items-center justify-center group ${isCurrentSong ? 'bg-black/50' : 'bg-black/40 hover:bg-black/50'}`}
@@ -300,11 +313,15 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                             {token && user?.id !== song.userId && (
                                 <button
                                     onClick={() => void handleReportSong()}
-                                    disabled={reportSubmitted}
+                                    disabled={reportSubmitted || isReporting}
                                     className="p-2 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-60"
                                     title={reportSubmitted ? t('reported') : t('reportSong')}
                                 >
-                                    <ThumbsDown size={16} className="text-zinc-700 dark:text-white" />
+                                    {isReporting ? (
+                                        <Loader2 size={16} className="text-zinc-700 dark:text-white animate-spin" />
+                                    ) : (
+                                        <ThumbsDown size={16} className="text-zinc-700 dark:text-white" />
+                                    )}
                                 </button>
                             )}
                             <div className="relative">
@@ -327,6 +344,11 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                                     />
                                 )}
                             </div>
+                            {reportError && (
+                                <p className="w-full text-center lg:text-left text-xs text-red-600 dark:text-red-300">
+                                    {reportError}
+                                </p>
+                            )}
                         </div>
 
                         {/* Lyrics */}
