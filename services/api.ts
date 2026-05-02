@@ -477,6 +477,24 @@ export const creditsApi = {
   }> => api('/api/credits/claim-daily', { method: 'POST', token }),
 };
 
+export const lyricsApi = {
+  draft: (params: {
+    prompt: string;
+    mood?: string;
+    style?: string;
+    language?: string;
+  }, token: string): Promise<{
+    draftId: string;
+    draft: {
+      title: string;
+      lyrics: string;
+      stylePrompt: string;
+      language: string;
+    };
+    creditsSpent: number;
+  }> => api('/api/lyrics/draft', { method: 'POST', body: params, token }),
+};
+
 // Users API
 export interface UserProfile extends User {
   bio?: string;
