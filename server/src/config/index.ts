@@ -31,6 +31,17 @@ export const config = {
     apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || '',
   },
 
+  // OpenAI API (optional fallback for formatting)
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  },
+
+  // Formatting provider
+  format: {
+    provider: (process.env.FORMAT_PROVIDER || 'auto') as 'auto' | 'gemini' | 'openai',
+  },
+
   // Frontend URL
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4444',
 

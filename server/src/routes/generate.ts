@@ -44,6 +44,8 @@ type GeminiFormatResult = {
   vocal_language?: string;
 };
 
+type FormatProvider = 'openai' | 'gemini';
+
 function parseGeminiJson(text: string): GeminiFormatResult | null {
   if (!text) return null;
   const first = text.indexOf('{');
@@ -65,6 +67,103 @@ function parseGeminiJson(text: string): GeminiFormatResult | null {
     console.error('[Format] Could not parse Gemini response JSON:', error);
     return null;
   }
+}
+
+async function formatWithOpenAI(input: GeminiFormatInput): Promise<GeminiFormatResult | null> {
+  const apiKey = config.openai.apiKey;
+  if (!apiKey) return null;
+
+  const payloadPrompt = `
+Improve the provided music prompt for ACE-Step style/lyrics formatting.
+Return ONLY JSON with keys: caption, lyrics, bpm, duration, key_scale, time_signature, vocal_language.
+Use "caption" for improved style prompt text.
+Use "lyrics" for polished lyrics (if provided).
+Return numbers for bpm/duration when possible.
+
+Input:
+Caption: ${input.caption}
+Lyrics: ${input.lyrics || 'N/A'}
+Requested BPM: ${input.bpm || 'N/A'}
+Requested Duration: ${input.duration || 'N/A'}
+Key: ${input.keyScale || 'N/A'}
+Time signature: ${input.timeSignature || 'N/A'}
+Temperature: ${input.temperature ?? 0.85}
+Top-k: ${input.topK || 'N/A'}
+Top-p: ${input.topP || 'N/A'}
+`.trim();
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.openai.model,
+        messages: [{ role: 'user', content: payloadPrompt }],
+        temperature: input.temperature ?? 0.85,
+        top_p: input.topP ?? 0.95,
+        max_tokens: 700,
+        response_format: { type: 'json_object' },
+      }),
+      signal: AbortSignal.timeout(120000),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      console.error('[Format] OpenAI API failed:', response.status, responseText.slice(0, 500));
+      return null;
+    }
+
+    let responseJson: unknown;
+    try {
+      responseJson = JSON.parse(responseText);
+    } catch (error) {
+      console.error('[Format] Failed to parse OpenAI top-level response:', error);
+      return null;
+    }
+
+    const parsedResponse = responseJson as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const rawText = parsedResponse?.choices?.[0]?.message?.content ?? '';
+    return parseGeminiJson(typeof rawText === 'string' ? rawText : '');
+  } catch (error) {
+    console.error('[Format] OpenAI request failed:', error);
+    return null;
+  }
+}
+
+function getFormatProviders(): FormatProvider[] {
+  const configured = config.format.provider || 'auto';
+  const hasOpenAI = Boolean(config.openai.apiKey);
+  const hasGemini = Boolean(config.gemini.apiKey);
+
+  if (configured === 'openai') {
+    return hasOpenAI ? ['openai'] : hasGemini ? ['gemini'] : [];
+  }
+  if (configured === 'gemini') {
+    return hasGemini ? ['gemini'] : hasOpenAI ? ['openai'] : [];
+  }
+
+  const providers: FormatProvider[] = [];
+  if (hasOpenAI) providers.push('openai');
+  if (hasGemini) providers.push('gemini');
+  return providers;
+}
+
+async function formatWithConfiguredProvider(input: GeminiFormatInput): Promise<GeminiFormatResult | null> {
+  for (const provider of getFormatProviders()) {
+    if (provider === 'openai') {
+      const openAIResult = await formatWithOpenAI(input);
+      if (openAIResult) return openAIResult;
+      continue;
+    }
+    const geminiResult = await formatWithGemini(input);
+    if (geminiResult) return geminiResult;
+  }
+  return null;
 }
 
 async function formatWithGemini(input: GeminiFormatInput): Promise<GeminiFormatResult | null> {
@@ -917,7 +1016,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
         const errMsg = apiData.error || apiData.detail || `Format API returned ${apiRes.status}`;
         console.error('[Format] API error:', errMsg);
 
-        const geminiResult = await formatWithGemini({
+        const fallbackResult = await formatWithConfiguredProvider({
           caption,
           lyrics: lyrics || undefined,
           bpm: bpm,
@@ -929,8 +1028,8 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
           topP: topP,
         });
 
-        if (geminiResult && (geminiResult.caption || geminiResult.lyrics)) {
-          res.json(geminiResult);
+        if (fallbackResult && (fallbackResult.caption || fallbackResult.lyrics)) {
+          res.json(fallbackResult);
           return;
         }
 
@@ -950,7 +1049,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
       });
       return;
     } catch (fetchErr: any) {
-      const geminiResult = await formatWithGemini({
+      const fallbackResult = await formatWithConfiguredProvider({
         caption,
         lyrics: lyrics || undefined,
         bpm: bpm,
@@ -962,8 +1061,8 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
         topP: topP,
       });
 
-      if (geminiResult && (geminiResult.caption || geminiResult.lyrics)) {
-        res.json(geminiResult);
+      if (fallbackResult && (fallbackResult.caption || fallbackResult.lyrics)) {
+        res.json(fallbackResult);
         return;
       }
 
