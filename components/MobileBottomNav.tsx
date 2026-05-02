@@ -1,5 +1,5 @@
 import React from 'react';
-import { Disc, Library, LogIn, Radio, Trophy, UserRound } from 'lucide-react';
+import { Disc, Library, LogIn, Radio, Trophy } from 'lucide-react';
 import { View } from '../types';
 import { useI18n } from '../context/I18nContext';
 
@@ -25,25 +25,25 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <div className="grid grid-cols-5 h-full">
         <NavButton
           icon={<Disc size={20} />}
-          label={t('create')}
+          label={t('mobileNavCreate')}
           active={currentView === 'create'}
           onClick={() => onNavigate('create')}
         />
         <NavButton
           icon={<Radio size={20} />}
-          label={t('feed')}
+          label={t('mobileNavFeed')}
           active={currentView === 'feed'}
           onClick={() => onNavigate('feed')}
         />
         <NavButton
           icon={<Trophy size={20} />}
-          label={t('leaderboards')}
+          label={t('mobileNavLeaderboard')}
           active={currentView === 'leaderboard'}
           onClick={() => onNavigate('leaderboard')}
         />
         <NavButton
           icon={<Library size={20} />}
-          label={t('library')}
+          label={t('mobileNavLibrary')}
           active={currentView === 'library'}
           onClick={() => onNavigate('library')}
         />
@@ -57,7 +57,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           ) : (
             <LogIn size={20} />
           )}
-          label={user ? t('profile') : t('signIn')}
+          label={user ? t('mobileNavProfile') : t('mobileNavSignIn')}
           active={currentView === 'profile'}
           onClick={user ? onProfile : onLogin}
         />
