@@ -71,6 +71,7 @@ const enTranslations: TranslationBundle = {
     claimedToday: 'Already claimed today',
     needCredits: 'Need {count} more credits',
     creditsUnavailable: 'Credits are unavailable',
+    moreOptions: 'More options',
     
     // Placeholders
     searchPlaceholder: 'Search...',
@@ -2492,6 +2493,7 @@ export const translations: Record<string, TranslationBundle> = {
     claimedToday: 'Dnes už vyzdvihnuté',
     needCredits: 'Chýba {count} kreditov',
     creditsUnavailable: 'Kredity nie sú dostupné',
+    moreOptions: 'Viac možností',
     searchPlaceholder: 'Hľadať...',
     language: 'Jazyk',
     english: 'Angličtina',

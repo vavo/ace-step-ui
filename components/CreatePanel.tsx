@@ -95,7 +95,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   }, []);
 
   // Mode
-  const [customMode, setCustomMode] = useState(true);
+  const [customMode, setCustomMode] = useState(false);
 
   // Simple Mode
   const [songDescription, setSongDescription] = useState('');
@@ -1246,6 +1246,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             </div>
 
             {/* Model Selection */}
+            {showAdvanced && (
             <div className="relative" ref={modelMenuRef}>
               <button
                 onClick={() => setShowModelMenu(!showModelMenu)}
@@ -1303,6 +1304,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
 
@@ -1988,7 +1990,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         >
           <div className="flex items-center gap-2">
             <Settings2 size={16} className="text-zinc-500" />
-            <span>{t('advancedSettings')}</span>
+            <span>{t('moreOptions')}</span>
           </div>
           <ChevronDown size={16} className={`text-zinc-500 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
         </button>
