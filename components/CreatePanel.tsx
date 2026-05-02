@@ -1331,15 +1331,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={handleDraftLyrics}
-                    disabled={isDraftingLyrics || !songDescription.trim()}
-                    title={t('draftLyrics')}
-                    className="p-1 rounded-md text-zinc-400 hover:text-pink-500 dark:hover:text-pink-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors disabled:opacity-40 disabled:hover:text-zinc-400"
-                  >
-                    {isDraftingLyrics ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  </button>
-                  <button
-                    type="button"
                     onClick={async () => {
                       if (!token) return;
                       try {
@@ -1364,6 +1355,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 placeholder={t('songDescriptionPlaceholder')}
                 className="w-full h-32 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
               />
+              <div className="px-3 pb-3">
+                <button
+                  type="button"
+                  onClick={handleDraftLyrics}
+                  disabled={isDraftingLyrics || !songDescription.trim()}
+                  className="w-full h-10 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold flex items-center justify-center gap-2 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-45 disabled:hover:bg-zinc-900 dark:disabled:hover:bg-white transition-colors"
+                >
+                  {isDraftingLyrics ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                  {isDraftingLyrics ? t('draftingLyrics') : t('draftLyrics')}
+                </button>
+              </div>
             </div>
 
             {/* Vocal Language (Simple) */}
