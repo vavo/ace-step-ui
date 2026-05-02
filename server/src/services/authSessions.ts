@@ -142,6 +142,7 @@ export function readBearerUser(req: Request): AuthenticatedUser | null {
 export async function readAuthenticatedUser(req: Request): Promise<AuthenticatedUser | null> {
   const sessionUser = await readSessionUser(req);
   if (sessionUser) return sessionUser;
+  if (config.nodeEnv === 'production') return null;
   return readBearerUser(req);
 }
 
