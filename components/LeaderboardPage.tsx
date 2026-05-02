@@ -51,10 +51,12 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
   const [songs, setSongs] = useState<RankedSong[]>([]);
   const [activeTab, setActiveTab] = useState<'songs' | 'creators'>('songs');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadLeaderboards = useCallback(async () => {
-    setLoading(true);
+  const loadLeaderboards = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
+    if (mode === 'refresh') setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       const response = await socialApi.getLeaderboards({ period: 'weekly', limit: 20, token });
@@ -65,11 +67,12 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
       setError(t('leaderboardLoadFailed'));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [token, t]);
 
   useEffect(() => {
-    loadLeaderboards();
+    loadLeaderboards('initial');
   }, [loadLeaderboards]);
 
   if (loading) {
@@ -92,11 +95,12 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
             </p>
           </div>
           <button
-            onClick={() => loadLeaderboards()}
-            className="w-10 h-10 rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white flex items-center justify-center transition-colors"
+            onClick={() => loadLeaderboards('refresh')}
+            disabled={refreshing}
+            className="w-10 h-10 rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white flex items-center justify-center transition-colors disabled:opacity-60"
             title={t('refresh')}
           >
-            <RefreshCw size={17} />
+            <RefreshCw size={17} className={refreshing ? 'animate-spin' : ''} />
           </button>
         </div>
 
@@ -140,7 +144,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                     onClick={() => onPlaySong?.(song, songs)}
                     className="relative w-16 h-16 rounded-lg overflow-hidden bg-zinc-200 dark:bg-zinc-800 flex-shrink-0"
                   >
-                    <img src={song.coverUrl} alt={song.title} className="w-full h-full object-cover" />
+                    <img src={song.coverUrl} alt={song.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     <span className="absolute inset-0 bg-black/35 flex items-center justify-center">
                       <Play size={18} className="text-white fill-current" />
                     </span>
@@ -195,7 +199,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                 </div>
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0">
                   {creator.avatar_url ? (
-                    <img src={creator.avatar_url} alt={creator.username} className="w-full h-full object-cover" />
+                    <img src={creator.avatar_url} alt={creator.username} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     creator.username[0]?.toUpperCase()
                   )}

@@ -160,35 +160,50 @@ router.get('/leaderboards', optionalAuthMiddleware, async (req: AuthenticatedReq
     );
 
     const creatorResult = await pool.query(
-      `SELECT *
-       FROM (
-         SELECT u.id, u.username, u.avatar_url, u.bio, u.xp, u.level,
-                (SELECT COUNT(*) FROM songs s WHERE s.user_id = u.id AND s.is_public = 1 AND s.created_at >= ?) as published_song_count,
-                (SELECT COALESCE(SUM(s.like_count), 0) FROM songs s WHERE s.user_id = u.id AND s.is_public = 1 AND s.created_at >= ?) as likes_received,
-                (SELECT COUNT(*) FROM followers f WHERE f.following_id = u.id AND f.created_at >= ?) as follower_growth,
-                (SELECT COALESCE(SUM(e.points), 0) FROM leaderboard_events e WHERE e.user_id = u.id AND e.period_start = ?) as event_points,
-                (
-                  (SELECT COUNT(*) FROM songs s WHERE s.user_id = u.id AND s.is_public = 1 AND s.created_at >= ?) * 20
-                  + (SELECT COALESCE(SUM(s.like_count), 0) FROM songs s WHERE s.user_id = u.id AND s.is_public = 1 AND s.created_at >= ?) * 5
-                  + (SELECT COUNT(*) FROM followers f WHERE f.following_id = u.id AND f.created_at >= ?) * 10
-                  + (SELECT COALESCE(SUM(e.points), 0) FROM leaderboard_events e WHERE e.user_id = u.id AND e.period_start = ?)
-                ) as leaderboard_score
-         FROM users u
+      `WITH weekly_songs AS (
+         SELECT user_id,
+                COUNT(*) as published_song_count,
+                COALESCE(SUM(like_count), 0) as likes_received
+         FROM songs
+         WHERE is_public = 1 AND created_at >= ?
+         GROUP BY user_id
+       ),
+       weekly_followers AS (
+         SELECT following_id as user_id,
+                COUNT(*) as follower_growth
+         FROM followers
+         WHERE created_at >= ?
+         GROUP BY following_id
+       ),
+       weekly_events AS (
+         SELECT user_id,
+                COALESCE(SUM(points), 0) as event_points
+         FROM leaderboard_events
+         WHERE period_start = ?
+         GROUP BY user_id
        )
-       WHERE published_song_count > 0 OR likes_received > 0 OR follower_growth > 0 OR event_points > 0
-       ORDER BY leaderboard_score DESC, xp DESC
+       SELECT u.id, u.username, u.avatar_url, u.bio, u.xp, u.level,
+              COALESCE(ws.published_song_count, 0) as published_song_count,
+              COALESCE(ws.likes_received, 0) as likes_received,
+              COALESCE(wf.follower_growth, 0) as follower_growth,
+              COALESCE(we.event_points, 0) as event_points,
+              (
+                COALESCE(ws.published_song_count, 0) * 20
+                + COALESCE(ws.likes_received, 0) * 5
+                + COALESCE(wf.follower_growth, 0) * 10
+                + COALESCE(we.event_points, 0)
+              ) as leaderboard_score
+       FROM users u
+       LEFT JOIN weekly_songs ws ON ws.user_id = u.id
+       LEFT JOIN weekly_followers wf ON wf.user_id = u.id
+       LEFT JOIN weekly_events we ON we.user_id = u.id
+       WHERE COALESCE(ws.published_song_count, 0) > 0
+          OR COALESCE(ws.likes_received, 0) > 0
+          OR COALESCE(wf.follower_growth, 0) > 0
+          OR COALESCE(we.event_points, 0) > 0
+       ORDER BY leaderboard_score DESC, COALESCE(u.xp, 0) DESC
        LIMIT ?`,
-      [
-        periodStart,
-        periodStart,
-        periodStart,
-        periodStart,
-        periodStart,
-        periodStart,
-        periodStart,
-        periodStart,
-        limit,
-      ]
+      [periodStart, periodStart, periodStart, limit]
     );
 
     const songs = await Promise.all(songResult.rows.map(mapFeedSong));

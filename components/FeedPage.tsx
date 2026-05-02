@@ -58,17 +58,25 @@ export const FeedPage: React.FC<FeedPageProps> = ({
   const [songs, setSongs] = useState<FeedSong[]>([]);
   const [nextOffset, setNextOffset] = useState<number | null>(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [safetyMessage, setSafetyMessage] = useState<string | null>(null);
+  const [safetyError, setSafetyError] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [reportingSong, setReportingSong] = useState<FeedSong | null>(null);
   const [reportReason, setReportReason] = useState('spam');
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [blockingCreatorId, setBlockingCreatorId] = useState<string | null>(null);
 
-  const loadFeed = useCallback(async (offset = 0) => {
+  const loadFeed = useCallback(async (offset = 0, mode: 'initial' | 'refresh' = 'initial') => {
     const isFirstPage = offset === 0;
-    if (isFirstPage) setLoading(true);
+    if (isFirstPage && mode === 'refresh') setRefreshing(true);
+    else if (isFirstPage) setLoading(true);
     else setLoadingMore(true);
     setError(null);
+    setSafetyMessage(null);
+    setSafetyError(null);
 
     try {
       const response = await socialApi.getFeed({ limit: PAGE_SIZE, offset, token });
@@ -80,12 +88,13 @@ export const FeedPage: React.FC<FeedPageProps> = ({
       setError(t('feedLoadFailed'));
     } finally {
       setLoading(false);
+      setRefreshing(false);
       setLoadingMore(false);
     }
   }, [token, t]);
 
   useEffect(() => {
-    loadFeed(0);
+    loadFeed(0, 'initial');
   }, [loadFeed]);
 
   const handleToggleLike = (songId: string) => {
@@ -103,21 +112,41 @@ export const FeedPage: React.FC<FeedPageProps> = ({
   };
 
   const submitReport = async () => {
-    if (!reportingSong || !token) return;
-    await socialApi.report({
-      targetType: 'song',
-      targetId: reportingSong.id,
-      reason: reportReason,
-    }, token);
-    setReportingSong(null);
-    setReportReason('spam');
+    if (!reportingSong || !token || submittingReport) return;
+    setSubmittingReport(true);
+    setSafetyError(null);
+    try {
+      await socialApi.report({
+        targetType: 'song',
+        targetId: reportingSong.id,
+        reason: reportReason,
+      }, token);
+      setReportingSong(null);
+      setReportReason('spam');
+      setSafetyMessage(t('reportSent'));
+    } catch (reportError) {
+      console.error('Failed to report song:', reportError);
+      setSafetyError(t('reportFailed'));
+    } finally {
+      setSubmittingReport(false);
+    }
   };
 
   const blockCreator = async (song: FeedSong) => {
-    if (!song.creator || !token) return;
-    await socialApi.blockUser(song.creator, token);
-    setSongs(prev => prev.filter(item => item.creator !== song.creator));
-    setOpenMenuId(null);
+    if (!song.creator || !token || blockingCreatorId) return;
+    setBlockingCreatorId(song.id);
+    setSafetyError(null);
+    try {
+      await socialApi.blockUser(song.creator, token);
+      setSongs(prev => prev.filter(item => song.userId ? item.userId !== song.userId : item.creator !== song.creator));
+      setSafetyMessage(t('creatorBlocked'));
+    } catch (blockError) {
+      console.error('Failed to block creator:', blockError);
+      setSafetyError(t('blockFailed'));
+    } finally {
+      setBlockingCreatorId(null);
+      setOpenMenuId(null);
+    }
   };
 
   if (loading) {
@@ -138,17 +167,28 @@ export const FeedPage: React.FC<FeedPageProps> = ({
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t('feedSubtitle')}</p>
           </div>
           <button
-            onClick={() => loadFeed(0)}
-            className="w-10 h-10 rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white flex items-center justify-center transition-colors"
+            onClick={() => loadFeed(0, 'refresh')}
+            disabled={refreshing || loadingMore}
+            className="w-10 h-10 rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white flex items-center justify-center transition-colors disabled:opacity-60"
             title={t('refresh')}
           >
-            <RefreshCw size={17} />
+            <RefreshCw size={17} className={refreshing ? 'animate-spin' : ''} />
           </button>
         </div>
 
         {error && (
           <div className="border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-300 rounded-lg px-4 py-3 text-sm mb-4">
             {error}
+          </div>
+        )}
+        {safetyMessage && (
+          <div className="border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-lg px-4 py-3 text-sm mb-4">
+            {safetyMessage}
+          </div>
+        )}
+        {safetyError && !reportingSong && (
+          <div className="border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-300 rounded-lg px-4 py-3 text-sm mb-4">
+            {safetyError}
           </div>
         )}
 
@@ -171,7 +211,7 @@ export const FeedPage: React.FC<FeedPageProps> = ({
                       title={song.creator || t('anonymous')}
                     >
                       {song.creator_avatar ? (
-                        <img src={song.creator_avatar} alt={song.creator || t('creator')} className="w-full h-full object-cover" />
+                        <img src={song.creator_avatar} alt={song.creator || t('creator')} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         song.creator?.[0]?.toUpperCase() || <UserRound size={18} />
                       )}
@@ -197,24 +237,33 @@ export const FeedPage: React.FC<FeedPageProps> = ({
                       </button>
                       {openMenuId === song.id && (
                         <div className="absolute right-0 top-9 z-20 w-44 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-xl py-1">
-                          <button
-                            onClick={() => {
-                              setReportingSong(song);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center gap-2"
-                          >
-                            <AlertTriangle size={14} />
-                            {t('reportSong')}
-                          </button>
-                          {song.creator && token && (
-                            <button
-                              onClick={() => blockCreator(song)}
-                              className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-300 hover:bg-red-500/10 flex items-center gap-2"
-                            >
-                              <Ban size={14} />
-                              {t('blockCreator')}
-                            </button>
+                          {token ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setReportingSong(song);
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center gap-2"
+                              >
+                                <AlertTriangle size={14} />
+                                {t('reportSong')}
+                              </button>
+                              {song.creator && (
+                                <button
+                                  onClick={() => blockCreator(song)}
+                                  disabled={blockingCreatorId === song.id}
+                                  className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-300 hover:bg-red-500/10 flex items-center gap-2 disabled:opacity-60"
+                                >
+                                  {blockingCreatorId === song.id ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
+                                  {t('blockCreator')}
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <div className="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">
+                              {t('signInToReport')}
+                            </div>
                           )}
                         </div>
                       )}
@@ -227,7 +276,7 @@ export const FeedPage: React.FC<FeedPageProps> = ({
                         onClick={() => onPlaySong?.(song, songs)}
                         className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-200 dark:bg-zinc-800"
                       >
-                        <img src={song.coverUrl} alt={song.title} className="w-full h-full object-cover" />
+                        <img src={song.coverUrl} alt={song.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         <span className="absolute inset-0 bg-black/35 flex items-center justify-center">
                           <span className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center shadow-lg">
                             <Play size={20} className="ml-0.5 fill-current" />
@@ -295,6 +344,7 @@ export const FeedPage: React.FC<FeedPageProps> = ({
             <select
               value={reportReason}
               onChange={(event) => setReportReason(event.target.value)}
+              disabled={submittingReport}
               className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white mb-4"
             >
               <option value="spam">{t('reportSpam')}</option>
@@ -302,18 +352,25 @@ export const FeedPage: React.FC<FeedPageProps> = ({
               <option value="copyright">{t('reportCopyright')}</option>
               <option value="other">{t('reportOther')}</option>
             </select>
+            {safetyError && (
+              <div className="border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-300 rounded-lg px-3 py-2 text-sm mb-4">
+                {safetyError}
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setReportingSong(null)}
+                disabled={submittingReport}
                 className="px-4 py-2 rounded-lg text-sm font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10"
               >
                 {t('cancel')}
               </button>
               <button
                 onClick={() => void submitReport()}
-                disabled={!token}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+                disabled={!token || submittingReport}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center gap-2"
               >
+                {submittingReport && <Loader2 size={16} className="animate-spin" />}
                 {t('submitReport')}
               </button>
             </div>
