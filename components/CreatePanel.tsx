@@ -687,7 +687,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Format handler - uses LLM to enhance style/lyrics and auto-fill parameters
   const handleFormat = async (target: 'style' | 'lyrics') => {
-    if (!token || !style.trim()) return;
+    const hasStyle = style.trim().length > 0;
+    const hasLyrics = lyrics.trim().length > 0;
+    const captionSource = target === 'style' ? style : (style.trim() || lyrics.trim());
+
+    if (!token) {
+      alert('Please complete the local setup/login before using AI format.');
+      return;
+    }
+
+    if (!hasStyle && !hasLyrics) {
+      alert('Please enter a Style or Lyrics prompt before using AI format.');
+      return;
+    }
+
+    if (target === 'style' && !hasStyle) {
+      alert('Style is required to run style-formatting.');
+      return;
+    }
+
     if (target === 'style') {
       setIsFormattingStyle(true);
     } else {
@@ -695,7 +713,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     }
     try {
       const result = await generateApi.formatInput({
-        caption: style,
+        caption: captionSource || 'Generate style enhancements.',
         lyrics: lyrics,
         bpm: bpm > 0 ? bpm : undefined,
         duration: duration > 0 ? duration : undefined,
@@ -1570,7 +1588,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormattingLyrics ? 'text-pink-500' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
                     title="AI Format - Enhance style & auto-fill parameters"
                     onClick={() => handleFormat('lyrics')}
-                    disabled={isFormattingLyrics || !style.trim()}
+                    disabled={isFormattingLyrics || !(style.trim() || lyrics.trim())}
                   >
                     {isFormattingLyrics ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   </button>

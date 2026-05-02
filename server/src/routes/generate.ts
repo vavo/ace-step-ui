@@ -22,6 +22,114 @@ import { getStorageProvider } from '../services/storage/factory.js';
 
 const router = Router();
 
+type GeminiFormatInput = {
+  caption: string;
+  lyrics?: string;
+  bpm?: number;
+  duration?: number;
+  keyScale?: string;
+  timeSignature?: string;
+  temperature?: number;
+  topK?: number;
+  topP?: number;
+};
+
+type GeminiFormatResult = {
+  caption?: string;
+  lyrics?: string;
+  bpm?: number;
+  duration?: number;
+  key_scale?: string;
+  time_signature?: string;
+  vocal_language?: string;
+};
+
+function parseGeminiJson(text: string): GeminiFormatResult | null {
+  if (!text) return null;
+  const first = text.indexOf('{');
+  const last = text.lastIndexOf('}');
+  if (first < 0 || last <= first) return null;
+  try {
+    const parsed = JSON.parse(text.slice(first, last + 1));
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      caption: typeof parsed.caption === 'string' ? parsed.caption : undefined,
+      lyrics: typeof parsed.lyrics === 'string' ? parsed.lyrics : undefined,
+      bpm: typeof parsed.bpm === 'number' && Number.isFinite(parsed.bpm) ? parsed.bpm : undefined,
+      duration: typeof parsed.duration === 'number' && Number.isFinite(parsed.duration) ? parsed.duration : undefined,
+      key_scale: typeof parsed.key_scale === 'string' ? parsed.key_scale : undefined,
+      time_signature: parsed.time_signature ? String(parsed.time_signature) : undefined,
+      vocal_language: typeof parsed.vocal_language === 'string' ? parsed.vocal_language : undefined,
+    };
+  } catch (error) {
+    console.error('[Format] Could not parse Gemini response JSON:', error);
+    return null;
+  }
+}
+
+async function formatWithGemini(input: GeminiFormatInput): Promise<GeminiFormatResult | null> {
+  const apiKey = config.gemini.apiKey;
+  if (!apiKey) return null;
+
+  const payloadPrompt = `
+Improve the provided music prompt for ACE-Step style/lyrics formatting.
+Return ONLY JSON with keys: caption, lyrics, bpm, duration, key_scale, time_signature, vocal_language.
+Use "caption" for improved style prompt text.
+Use "lyrics" for polished lyrics (if provided).
+Return numbers for bpm/duration when possible.
+
+Input:
+Caption: ${input.caption}
+Lyrics: ${input.lyrics || 'N/A'}
+Requested BPM: ${input.bpm || 'N/A'}
+Requested Duration: ${input.duration || 'N/A'}
+Key: ${input.keyScale || 'N/A'}
+Time signature: ${input.timeSignature || 'N/A'}
+Temperature: ${input.temperature ?? 0.85}
+Top-k: ${input.topK || 'N/A'}
+Top-p: ${input.topP || 'N/A'}
+  `.trim();
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: payloadPrompt }] }],
+        generationConfig: {
+          temperature: input.temperature ?? 0.85,
+          topK: input.topK ?? 40,
+          topP: input.topP ?? 0.95,
+        },
+      }),
+      signal: AbortSignal.timeout(120000),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      console.error('[Format] Gemini API failed:', response.status, responseText.slice(0, 500));
+      return null;
+    }
+
+    let responseJson: unknown;
+    try {
+      responseJson = JSON.parse(responseText);
+    } catch (error) {
+      console.error('[Format] Failed to parse Gemini top-level response:', error);
+      return null;
+    }
+
+    const parsedResponse = responseJson as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const rawText = parsedResponse?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    return parseGeminiJson(typeof rawText === 'string' ? rawText : '');
+  } catch (error) {
+    console.error('[Format] Gemini request failed:', error);
+    return null;
+  }
+}
+
 // Auto-generate a song title from lyrics or style when none is provided
 function autoTitle(params: { title?: string; lyrics?: string; instrumental?: boolean; style?: string; songDescription?: string }): string {
   if (params.title?.trim()) return params.title.trim();
@@ -108,7 +216,7 @@ interface GenerateBody {
   randomSeed?: boolean;
   seed?: number;
   thinking?: boolean;
-  audioFormat?: 'mp3' | 'flac';
+  audioFormat?: 'mp3' | 'flac' | 'wav';
   inferMethod?: 'ode' | 'sde';
   shift?: number;
 
@@ -427,7 +535,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
 
               try {
                 const { buffer } = await downloadAudioToBuffer(audioUrl);
-                const ext = audioUrl.includes('.flac') ? '.flac' : '.mp3';
+                const ext = audioUrl.includes('.wav') ? '.wav' : audioUrl.includes('.flac') ? '.flac' : '.mp3';
                 const storageKey = `${req.user!.id}/${songId}${ext}`;
                 await storage.upload(storageKey, buffer, `audio/${ext.slice(1)}`);
                 const storedPath = storage.getPublicUrl(storageKey);
@@ -808,6 +916,24 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
       if (!apiRes.ok || apiData.code !== 200) {
         const errMsg = apiData.error || apiData.detail || `Format API returned ${apiRes.status}`;
         console.error('[Format] API error:', errMsg);
+
+        const geminiResult = await formatWithGemini({
+          caption,
+          lyrics: lyrics || undefined,
+          bpm: bpm,
+          duration: duration,
+          keyScale: keyScale || undefined,
+          timeSignature: timeSignature || undefined,
+          temperature: temperature,
+          topK: topK,
+          topP: topP,
+        });
+
+        if (geminiResult && (geminiResult.caption || geminiResult.lyrics)) {
+          res.json(geminiResult);
+          return;
+        }
+
         res.status(500).json({ success: false, error: errMsg });
         return;
       }
@@ -824,6 +950,23 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
       });
       return;
     } catch (fetchErr: any) {
+      const geminiResult = await formatWithGemini({
+        caption,
+        lyrics: lyrics || undefined,
+        bpm: bpm,
+        duration: duration,
+        keyScale: keyScale || undefined,
+        timeSignature: timeSignature || undefined,
+        temperature: temperature,
+        topK: topK,
+        topP: topP,
+      });
+
+      if (geminiResult && (geminiResult.caption || geminiResult.lyrics)) {
+        res.json(geminiResult);
+        return;
+      }
+
       // Only fall back to Python spawn on network errors (service not yet reachable)
       if (fetchErr?.name !== 'AbortError' && (fetchErr?.code === 'ECONNREFUSED' || fetchErr?.cause?.code === 'ECONNREFUSED')) {
         console.warn('[Format] REST API unreachable, falling back to Python spawn');

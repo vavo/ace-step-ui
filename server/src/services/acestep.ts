@@ -76,6 +76,21 @@ const ACESTEP_DIR = resolveAceStepPath();
 const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
 const PYTHON_SCRIPT = path.join(SCRIPTS_DIR, 'simple_generate.py');
 
+function getFallbackAudioFormat(params: Pick<GenerationParams, 'audioFormat'>): 'wav' | 'flac' {
+  if (params.audioFormat === 'flac') {
+    return 'flac';
+  }
+  return 'wav';
+}
+
+function getAudioExtension(filePath: string): '.mp3' | '.flac' | '.wav' | '' {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.mp3' || ext === '.flac' || ext === '.wav') {
+    return ext;
+  }
+  return '';
+}
+
 // ---------------------------------------------------------------------------
 // Gradio generation: map params to the 51 positional args for /generation_wrapper
 // ---------------------------------------------------------------------------
@@ -278,7 +293,7 @@ export interface GenerationParams {
   seed?: number;
   thinking?: boolean;
   enhance?: boolean;
-  audioFormat?: 'mp3' | 'flac';
+  audioFormat?: 'mp3' | 'flac' | 'wav';
   inferMethod?: 'ode' | 'sde';
   shift?: number;
 
@@ -580,7 +595,7 @@ async function processGenerationViaGradio(
 
   for (const fileObj of audioFileObjects) {
     const origName = fileObj.orig_name || fileObj.path || '';
-    const ext = origName.includes('.flac') ? '.flac' : `.${audioFormat}`;
+    const ext = getAudioExtension(origName) || `.${audioFormat}`;
     const filename = `${jobId}_${audioUrls.length}${ext}`;
     const destPath = path.join(AUDIO_DIR, filename);
 
@@ -672,7 +687,7 @@ async function processGenerationViaPython(
       '--batch-size', String(params.batchSize ?? 1),
       '--infer-steps', String(params.inferenceSteps ?? 8),
       '--guidance-scale', String(params.guidanceScale ?? 10.0),
-      '--audio-format', params.audioFormat ?? 'mp3',
+      '--audio-format', getFallbackAudioFormat(params),
       '--output-dir', jobOutputDir,
       '--json',
     ];
@@ -730,7 +745,7 @@ async function processGenerationViaPython(
     const audioUrls: string[] = [];
     let actualDuration = 0;
     for (const srcPath of result.audio_paths) {
-      const ext = srcPath.includes('.flac') ? '.flac' : '.mp3';
+      const ext = getAudioExtension(srcPath) || `.${getFallbackAudioFormat(params)}`;
       const filename = `${jobId}_${audioUrls.length}${ext}`;
       const destPath = path.join(AUDIO_DIR, filename);
 
@@ -916,10 +931,11 @@ export async function getAudioStream(audioPath: string): Promise<Response> {
     const localPath = path.join(AUDIO_DIR, audioPath.replace('/audio/', ''));
     try {
       const buffer = await readFile(localPath);
-      const ext = localPath.endsWith('.flac') ? 'flac' : 'mpeg';
+      const ext = getAudioExtension(localPath) || '.mp3';
+      const contentType = ext === '.flac' ? 'flac' : ext === '.wav' ? 'wav' : 'mpeg';
       return new Response(buffer, {
         status: 200,
-        headers: { 'Content-Type': `audio/${ext}` }
+        headers: { 'Content-Type': `audio/${contentType}` }
       });
     } catch (err) {
       console.error('Failed to read local audio file:', localPath, err);
@@ -931,10 +947,11 @@ export async function getAudioStream(audioPath: string): Promise<Response> {
   if (audioPath.startsWith('/')) {
     try {
       const buffer = await readFile(audioPath);
-      const ext = audioPath.endsWith('.flac') ? 'flac' : audioPath.endsWith('.wav') ? 'wav' : 'mpeg';
+      const ext = getAudioExtension(audioPath) || '.mp3';
+      const contentType = ext === '.flac' ? 'flac' : ext === '.wav' ? 'wav' : 'mpeg';
       return new Response(buffer, {
         status: 200,
-        headers: { 'Content-Type': `audio/${ext}` }
+        headers: { 'Content-Type': `audio/${contentType}` }
       });
     } catch {
       // Fall through to Gradio API

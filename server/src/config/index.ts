@@ -26,6 +26,11 @@ export const config = {
     apiKey: process.env.PEXELS_API_KEY || '',
   },
 
+  // Gemini API
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || '',
+  },
+
   // Frontend URL
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4444',
 
