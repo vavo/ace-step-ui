@@ -2,7 +2,7 @@
 
 Date: 2026-05-03
 
-Audited implementation range: `3496ae2..f3c727a`
+Audited implementation range: `3496ae2..f19e9fc`
 
 Scope: the plan-related commits for social feed, gamification, session auth, credits, mobile retention surfaces, create-flow polish, and follow-up fixes. Stripe and billing are intentionally out of scope for this pass.
 
@@ -17,39 +17,39 @@ Scope: the plan-related commits for social feed, gamification, session auth, cre
   - `/api/generate/limits` now returns safe fallback limits instead of a 500 when the runtime limit probe is unavailable.
   - This keeps anonymous startup and create-flow diagnostics quieter while still exposing the backend error for debugging.
 
+- `9fa7851 fix: restore sessions without persisted tokens`
+  - Frontend startup now uses quiet cookie-session restore via `/api/auth/session`.
+  - Legacy `acestep_token` and `acestep_user` localStorage entries are removed on load/logout.
+  - Session restore no longer logs expected anonymous startup as a warning path.
+
+- `c3b1c52 perf: split frontend route bundles`
+  - Non-default views and video generation load lazily.
+  - Vendor, React, and icon code are split into separate chunks.
+  - The Vite large chunk warning is gone in the verified build.
+
+- `3553e54 fix: harden credits and rate limits`
+  - Rate limits now persist in SQLite instead of process memory.
+  - Daily credit streak date keys use `PRODUCT_TIME_ZONE`, defaulting to `Europe/Bratislava`.
+  - Untouched legacy users with a 100-credit balance and no ledger rows get a conservative signup grant ledger backfill.
+
+- `26c5c88 docs: track implementation plan status`
+  - `docs/devplan.md` and `docs/multi-user-mvp-plan.md` are now tracked instead of ignored.
+
+- `f19e9fc fix: disable bearer auth in production`
+  - Cookie sessions are still checked first everywhere.
+  - Bearer auth fallback is now development-only, so production is not accepting long-lived JWT fallback auth.
+
 ## Remaining Landmines
 
-- Auth still supports long-lived bearer tokens stored in `localStorage`.
-  - Cookie sessions are present and checked first, but the frontend still stores `acestep_token` and sends bearer auth for compatibility.
-  - Before production, this should be narrowed to httpOnly cookie sessions with a deliberate migration path for local/dev users.
+- Stripe remains intentionally out of scope for this pass.
 
-- The original plan docs are local-only.
-  - `.gitignore` excludes `docs/devplan.md` and `docs/multi-user-mvp-plan.md`.
-  - Status updates inside those files will not land in git unless the project moves plan status into a tracked doc.
-
-- Frontend bundle size is still above Vite's warning threshold.
-  - The current app build passes, but the main JS chunk remains large.
-  - Track D improved mobile UX, not code splitting. Route-level splitting is still a production polish item.
-
-- Anonymous startup still has auth/session-restore noise in browser smoke output.
-  - Earlier mobile smoke runs showed expected unauthenticated `/api/auth/me` 401/session-restore noise.
-  - The user-facing UI is usable, but diagnostics are louder than they need to be.
-
-- Rate limiting is process-local memory.
-  - `server/src/services/rateLimit.ts` is acceptable for a single-process SQLite MVP.
-  - It will not provide durable or shared enforcement across restarts, clustered servers, or multiple instances.
-
-- Credit streak dates use UTC day keys.
-  - This is deterministic, but it may not match a Europe/Bratislava product day.
-  - Decide now whether streaks reset by UTC or by the user's local timezone; changing it later can create awkward streak complaints.
-
-- Signup grant history is fixed only for newly created accounts.
-  - Users created before `29c08fa` can still lack a `signup_grant` ledger row.
-  - If that matters for launch data quality, add an explicit one-time backfill that only targets accounts whose ledger proves the grant is missing and whose balance history can be safely reconciled.
+- Bearer tokens still exist as a local/dev compatibility path.
+  - Production no longer accepts bearer fallback after cookie-session lookup fails.
+  - A later cleanup can remove token plumbing from the React API wrappers, but that is now cleanup, not a production auth landmine.
 
 ## Verification
 
 - Server build: passed.
 - Full app build: passed.
 - Diff whitespace checks: passed.
-- Known build warning: Vite still reports a large JS chunk.
+- Vite large chunk warning: fixed.
