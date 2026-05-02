@@ -1,31 +1,31 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CreatePanel } from './components/CreatePanel';
 import { SongList } from './components/SongList';
 import { RightSidebar } from './components/RightSidebar';
 import { Player } from './components/Player';
-import { LibraryView } from './components/LibraryView';
 import { CreatePlaylistModal, AddToPlaylistModal } from './components/PlaylistModals';
-import { VideoGeneratorModal } from './components/VideoGeneratorModal';
 import { UsernameModal } from './components/UsernameModal';
-import { UserProfile } from './components/UserProfile';
 import { SettingsModal } from './components/SettingsModal';
-import { SongProfile } from './components/SongProfile';
 import { Song, GenerationParams, View, Playlist } from './types';
 import { generateApi, songsApi, playlistsApi, getAudioUrl } from './services/api';
 import { useAuth } from './context/AuthContext';
 import { I18nProvider, useI18n } from './context/I18nContext';
 import { Language } from './i18n/translations';
 import { List } from 'lucide-react';
-import { PlaylistDetail } from './components/PlaylistDetail';
 import { Toast, ToastType } from './components/Toast';
-import { SearchPage } from './components/SearchPage';
-import { TrainingPanel } from './components/TrainingPanel';
 import { ConfirmDialog } from './components/ConfirmDialog';
-import { FeedPage } from './components/FeedPage';
-import { LeaderboardPage } from './components/LeaderboardPage';
 import { MobileBottomNav } from './components/MobileBottomNav';
 
+const FeedPage = lazy(() => import('./components/FeedPage').then((module) => ({ default: module.FeedPage })));
+const LeaderboardPage = lazy(() => import('./components/LeaderboardPage').then((module) => ({ default: module.LeaderboardPage })));
+const LibraryView = lazy(() => import('./components/LibraryView').then((module) => ({ default: module.LibraryView })));
+const PlaylistDetail = lazy(() => import('./components/PlaylistDetail').then((module) => ({ default: module.PlaylistDetail })));
+const SearchPage = lazy(() => import('./components/SearchPage').then((module) => ({ default: module.SearchPage })));
+const SongProfile = lazy(() => import('./components/SongProfile').then((module) => ({ default: module.SongProfile })));
+const TrainingPanel = lazy(() => import('./components/TrainingPanel').then((module) => ({ default: module.TrainingPanel })));
+const UserProfile = lazy(() => import('./components/UserProfile').then((module) => ({ default: module.UserProfile })));
+const VideoGeneratorModal = lazy(() => import('./components/VideoGeneratorModal').then((module) => ({ default: module.VideoGeneratorModal })));
 
 function AppContent() {
   // i18n
@@ -148,6 +148,12 @@ function AppContent() {
   const closeToast = () => {
     setToast(prev => ({ ...prev, isVisible: false }));
   };
+
+  const routeFallback = (
+    <div className="flex h-full w-full items-center justify-center bg-white text-sm text-zinc-500 dark:bg-suno-DEFAULT dark:text-white/50">
+      Loading...
+    </div>
+  );
 
   // Show username modal if not authenticated and not loading
   useEffect(() => {
@@ -1468,7 +1474,9 @@ function AppContent() {
         />
 
         <main className="flex-1 flex overflow-hidden relative">
-          {renderContent()}
+          <Suspense fallback={routeFallback}>
+            {renderContent()}
+          </Suspense>
         </main>
       </div>
 
@@ -1529,11 +1537,15 @@ function AppContent() {
         isVisible={toast.isVisible}
         onClose={closeToast}
       />
-      <VideoGeneratorModal
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        song={songForVideo}
-      />
+      {isVideoModalOpen && (
+        <Suspense fallback={null}>
+          <VideoGeneratorModal
+            isOpen={isVideoModalOpen}
+            onClose={() => setIsVideoModalOpen(false)}
+            song={songForVideo}
+          />
+        </Suspense>
+      )}
           <UsernameModal
             isOpen={showUsernameModal}
             onSubmit={handleUsernameSubmit}
