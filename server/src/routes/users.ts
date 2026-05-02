@@ -4,9 +4,11 @@ import path from 'path';
 import { pool } from '../db/pool.js';
 import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
+import { getUserBadges, recordFollow } from '../services/gamification.js';
+import { checkRateLimit } from '../services/rateLimit.js';
 
 const router = Router();
-const userSelectFields = 'id, username, created_at, bio, avatar_url, banner_url, default_vocal_language, default_ui_language';
+const userSelectFields = 'id, username, created_at, bio, avatar_url, banner_url, default_vocal_language, default_ui_language, plan, xp, level';
 
 function getValidUiLanguage(language: unknown): string | null {
   if (typeof language !== 'string') return null;
@@ -96,7 +98,13 @@ router.get('/:username', optionalAuthMiddleware, async (req: AuthenticatedReques
 
         const user = result.rows[0];
 
-        res.json({ user });
+        res.json({
+            user: {
+                ...user,
+                accountTier: user.plan || 'free',
+                badges: getUserBadges(user.id),
+            }
+        });
     } catch (error) {
         console.error('Get user profile error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -371,11 +379,23 @@ router.post('/:username/follow', authMiddleware, async (req: AuthenticatedReques
             );
             following = false;
         } else {
+            const rateLimit = checkRateLimit({
+                userId: currentUserId,
+                action: 'follow',
+                limit: 20,
+                windowMs: 60 * 60 * 1000,
+            });
+            if (!rateLimit.allowed) {
+                res.status(429).json({ error: 'Too many follows', retryAfterSeconds: rateLimit.retryAfterSeconds });
+                return;
+            }
+
             // Follow
             await pool.query(
                 'INSERT INTO followers (follower_id, following_id) VALUES ($1, $2)',
                 [currentUserId, targetUserId]
             );
+            recordFollow(currentUserId, targetUserId);
             following = true;
         }
 

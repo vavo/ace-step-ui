@@ -133,6 +133,7 @@ export interface User {
   id: string;
   username: string;
   createdAt: Date;
+  created_at?: string;
   followerCount?: number;
   followingCount?: number;
   isFollowing?: boolean;
@@ -141,6 +142,19 @@ export interface User {
   banner_url?: string;
   default_vocal_language?: string;
   default_ui_language?: string;
+  plan?: string;
+  accountTier?: string;
+  supporter_since?: string;
+  xp?: number;
+  level?: number;
+  badges?: Array<{
+    id: string;
+    badge_key?: string;
+    label: string;
+    description: string;
+    color: string;
+    awarded_at?: string;
+  }>;
 }
 
 export interface UserProfile {

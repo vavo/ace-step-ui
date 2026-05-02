@@ -57,8 +57,24 @@ export interface User {
   avatar_url?: string;
   banner_url?: string;
   createdAt?: string;
+  created_at?: string;
   default_vocal_language?: string;
   default_ui_language?: string;
+  plan?: string;
+  accountTier?: string;
+  xp?: number;
+  level?: number;
+  badges?: UserBadge[];
+}
+
+export interface UserBadge {
+  id: string;
+  badge_key?: string;
+  label: string;
+  description: string;
+  color: string;
+  awarded_at?: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface UserProfileUpdate {
@@ -120,6 +136,9 @@ export interface Song {
   created_at: string;
   creator?: string;
   creator_avatar?: string;
+  comment_count?: number;
+  is_liked?: boolean;
+  leaderboard_score?: number;
   ditModel?: string;
   generation_params?: any;
 }
@@ -617,6 +636,65 @@ export const searchApi = {
       songs: transformSongs(result.songs || []),
     };
   },
+};
+
+export interface FeedResponse {
+  items: Song[];
+  pagination: {
+    limit: number;
+    offset: number;
+    nextOffset: number | null;
+  };
+}
+
+export interface LeaderboardsResponse {
+  period: 'weekly';
+  periodStart: string;
+  songs: Song[];
+  creators: Array<UserProfile & {
+    rank: number;
+    published_song_count: number;
+    likes_received: number;
+    follower_growth: number;
+    event_points: number;
+    leaderboard_score: number;
+    badges?: UserBadge[];
+  }>;
+}
+
+export const socialApi = {
+  getFeed: async (params: { limit?: number; offset?: number; token?: string | null } = {}): Promise<FeedResponse> => {
+    const query = new URLSearchParams();
+    if (params.limit) query.set('limit', String(params.limit));
+    if (params.offset) query.set('offset', String(params.offset));
+    const suffix = query.toString() ? `?${query}` : '';
+    const result = await api(`/api/feed${suffix}`, { token: params.token || undefined }) as FeedResponse;
+    return { ...result, items: transformSongs(result.items || []) };
+  },
+
+  getLeaderboards: async (params: { period?: 'weekly'; limit?: number; token?: string | null } = {}): Promise<LeaderboardsResponse> => {
+    const query = new URLSearchParams({ period: params.period || 'weekly' });
+    if (params.limit) query.set('limit', String(params.limit));
+    const result = await api(`/api/leaderboards?${query}`, { token: params.token || undefined }) as LeaderboardsResponse;
+    return { ...result, songs: transformSongs(result.songs || []) };
+  },
+
+  report: (body: {
+    targetType: 'song' | 'user' | 'comment';
+    targetId: string;
+    reason: string;
+    details?: string;
+  }, token: string): Promise<{ report: { id: string; targetType: string; targetId: string; reason: string; status: string } }> =>
+    api('/api/reports', { method: 'POST', body, token }),
+
+  getBlockedUsers: (token: string): Promise<{ users: UserProfile[] }> =>
+    api('/api/blocks', { token }),
+
+  blockUser: (username: string, token: string): Promise<{ blocked: boolean; user: UserProfile }> =>
+    api(`/api/blocks/${encodeURIComponent(username)}`, { method: 'POST', token }),
+
+  unblockUser: (username: string, token: string): Promise<{ blocked: boolean; user: UserProfile }> =>
+    api(`/api/blocks/${encodeURIComponent(username)}`, { method: 'DELETE', token }),
 };
 
 // Contact Form API

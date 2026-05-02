@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/pool.js';
 import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
+import { recordComment, recordPublishedSong, recordSongLike, recordSongPlay } from '../services/gamification.js';
+import { checkRateLimit } from '../services/rateLimit.js';
 
 const router = Router();
 
@@ -341,6 +343,10 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       ]
     );
 
+    if (result.rows[0]?.is_public) {
+      recordPublishedSong(req.user!.id, result.rows[0].id);
+    }
+
     res.status(201).json({ song: result.rows[0] });
   } catch (error) {
     console.error('Create song error:', error);
@@ -479,6 +485,7 @@ router.post('/:id/like', authMiddleware, async (req: AuthenticatedRequest, res: 
         [req.params.id]
       );
       await client.query('COMMIT');
+      recordSongLike(req.params.id, req.user!.id);
       res.json({ liked: true });
     }
   } catch (error) {
@@ -539,6 +546,10 @@ router.patch('/:id/privacy', authMiddleware, async (req: AuthenticatedRequest, r
       req.params.id,
     ]);
 
+    if (newPublicState) {
+      recordPublishedSong(req.user!.id, req.params.id);
+    }
+
     res.json({ isPublic: newPublicState });
   } catch (error) {
     console.error('Toggle privacy error:', error);
@@ -561,6 +572,8 @@ router.post('/:id/play', optionalAuthMiddleware, async (req: AuthenticatedReques
       res.status(404).json({ error: 'Song not found' });
       return;
     }
+
+    recordSongPlay(req.params.id, req.user?.id);
 
     res.json({ viewCount: result.rows[0].view_count });
   } catch (error) {
@@ -593,6 +606,17 @@ router.post('/:id/comments', authMiddleware, async (req: AuthenticatedRequest, r
   try {
     const { content } = req.body;
 
+    const rateLimit = checkRateLimit({
+      userId: req.user!.id,
+      action: 'comment',
+      limit: 8,
+      windowMs: 60 * 1000,
+    });
+    if (!rateLimit.allowed) {
+      res.status(429).json({ error: 'Too many comments', retryAfterSeconds: rateLimit.retryAfterSeconds });
+      return;
+    }
+
     if (!content || content.trim().length === 0) {
       res.status(400).json({ error: 'Comment content is required' });
       return;
@@ -621,6 +645,8 @@ router.post('/:id/comments', authMiddleware, async (req: AuthenticatedRequest, r
       username: req.user!.username,
       user_id: req.user!.id,
     };
+
+    recordComment(req.user!.id, req.params.id, result.rows[0].id);
 
     res.status(201).json({ comment });
   } catch (error) {

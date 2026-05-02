@@ -27,6 +27,7 @@ import {
   refundCredits,
   reserveCredits,
 } from '../services/credits.js';
+import { recordPublishedSong } from '../services/gamification.js';
 
 const router = Router();
 
@@ -842,6 +843,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
                   ]
                 );
 
+                recordPublishedSong(req.user!.id, songId);
                 localPaths.push(storedPath);
               } catch (downloadError) {
                 console.error(`Failed to download audio ${i + 1}:`, downloadError);
@@ -867,6 +869,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
                     JSON.stringify(params),
                   ]
                 );
+                recordPublishedSong(req.user!.id, songId);
                 localPaths.push(audioUrl);
               }
             }
