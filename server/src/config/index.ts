@@ -45,6 +45,14 @@ export const config = {
   // Frontend URL
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4444',
 
+  auth: {
+    publicApiUrl: process.env.PUBLIC_API_URL || process.env.SERVER_PUBLIC_URL || '',
+    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    googleCallbackUrl: process.env.GOOGLE_OAUTH_CALLBACK_URL || '',
+    sessionDays: parseInt(process.env.AUTH_SESSION_DAYS || '30', 10),
+  },
+
   // Storage (local only)
   storage: {
     provider: 'local' as const,

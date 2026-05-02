@@ -52,6 +52,9 @@ async function api<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
 export interface User {
   id: string;
   username: string;
+  email?: string;
+  displayName?: string;
+  display_name?: string;
   isAdmin?: boolean;
   bio?: string;
   avatar_url?: string;
@@ -62,6 +65,7 @@ export interface User {
   default_ui_language?: string;
   plan?: string;
   accountTier?: string;
+  credit_balance?: number;
   xp?: number;
   level?: number;
   badges?: UserBadge[];
@@ -94,21 +98,25 @@ export interface AuthResponse {
 }
 
 export const authApi = {
-  // Auto-login: Get existing user from database (for local single-user app)
+  googleStartUrl: '/api/auth/google/start',
+
   auto: (): Promise<AuthResponse> =>
     api('/api/auth/auto'),
 
   setup: (username: string): Promise<AuthResponse> =>
     api('/api/auth/setup', { method: 'POST', body: { username } }),
 
-  me: (token: string): Promise<{ user: User }> =>
-    api('/api/auth/me', { token }),
+  localDev: (username?: string): Promise<AuthResponse> =>
+    api('/api/auth/local-dev', { method: 'POST', body: { username } }),
+
+  me: (token?: string | null): Promise<AuthResponse> =>
+    api('/api/auth/me', { token: token || undefined }),
 
   logout: (): Promise<{ success: boolean }> =>
     api('/api/auth/logout', { method: 'POST' }),
 
-  refresh: (token: string): Promise<AuthResponse> =>
-    api('/api/auth/refresh', { method: 'POST', token }),
+  refresh: (token?: string | null): Promise<AuthResponse> =>
+    api('/api/auth/refresh', { method: 'POST', token: token || undefined }),
 
   updateUsername: (username: string, token: string): Promise<AuthResponse> =>
     api('/api/auth/username', { method: 'PATCH', body: { username }, token }),

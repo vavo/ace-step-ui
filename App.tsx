@@ -34,7 +34,7 @@ function AppContent() {
   const { isMobile, isDesktop } = useResponsive();
 
   // Auth
-  const { user, token, isAuthenticated, isLoading: authLoading, setupUser, logout } = useAuth();
+  const { user, token, isAuthenticated, isLoading: authLoading, setupUser, startGoogleLogin, logout } = useAuth();
   
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   // Track multiple concurrent generation jobs
@@ -1495,10 +1495,11 @@ function AppContent() {
         onClose={() => setIsVideoModalOpen(false)}
         song={songForVideo}
       />
-      <UsernameModal
-        isOpen={showUsernameModal}
-        onSubmit={handleUsernameSubmit}
-      />
+          <UsernameModal
+            isOpen={showUsernameModal}
+            onSubmit={handleUsernameSubmit}
+            onGoogleLogin={startGoogleLogin}
+          />
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}

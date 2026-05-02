@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { X, User, Sparkles } from 'lucide-react';
+import { User, Sparkles } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
 
 interface UsernameModalProps {
   isOpen: boolean;
   onSubmit: (username: string) => Promise<void>;
+  onGoogleLogin?: () => void;
 }
 
-export const UsernameModal: React.FC<UsernameModalProps> = ({ isOpen, onSubmit }) => {
+export const UsernameModal: React.FC<UsernameModalProps> = ({ isOpen, onSubmit, onGoogleLogin }) => {
   const { t } = useI18n();
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
@@ -68,6 +69,24 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({ isOpen, onSubmit }
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {onGoogleLogin && (
+              <button
+                type="button"
+                onClick={onGoogleLogin}
+                className="w-full py-3 bg-white text-zinc-950 font-semibold rounded-xl hover:bg-zinc-100 transition-all"
+              >
+                Continue with Google
+              </button>
+            )}
+
+            {onGoogleLogin && (
+              <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-zinc-500">
+                <div className="h-px flex-1 bg-zinc-800" />
+                or
+                <div className="h-px flex-1 bg-zinc-800" />
+              </div>
+            )}
+
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-zinc-300 mb-2">
                 {t('yourName')}

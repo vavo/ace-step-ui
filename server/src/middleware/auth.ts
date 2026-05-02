@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { config } from '../config/index.js';
 import { pool } from '../db/pool.js';
+import { readAuthenticatedUser } from '../services/authSessions.js';
 
 export interface AuthenticatedUser {
   id: string;
@@ -13,44 +12,33 @@ export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
 }
 
-export function authMiddleware(
+export async function authMiddleware(
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-): void {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'No token provided' });
-    return;
-  }
-
-  const token = authHeader.substring(7);
-
+): Promise<void> {
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as AuthenticatedUser;
-    req.user = decoded;
+    const user = await readAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'No active session' });
+      return;
+    }
+    req.user = user;
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    res.status(401).json({ error: 'Invalid or expired session' });
   }
 }
 
-export function optionalAuthMiddleware(
+export async function optionalAuthMiddleware(
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-): void {
-  const authHeader = req.headers.authorization;
-
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    try {
-      const decoded = jwt.verify(token, config.jwt.secret) as AuthenticatedUser;
-      req.user = decoded;
-    } catch {
-      // Token invalid, but continue without user
-    }
+): Promise<void> {
+  try {
+    req.user = await readAuthenticatedUser(req) ?? undefined;
+  } catch {
+    // Invalid auth should not block public reads.
   }
 
   next();
@@ -61,21 +49,16 @@ export async function adminMiddleware(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'No token provided' });
-    return;
-  }
-
-  const token = authHeader.substring(7);
-
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as AuthenticatedUser;
+    const user = await readAuthenticatedUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'No active session' });
+      return;
+    }
 
     const result = await pool.query(
       'SELECT is_admin FROM users WHERE id = ?',
-      [decoded.id]
+      [user.id]
     );
 
     if (result.rows.length === 0 || !result.rows[0].is_admin) {
@@ -83,9 +66,9 @@ export async function adminMiddleware(
       return;
     }
 
-    req.user = { ...decoded, isAdmin: true };
+    req.user = { ...user, isAdmin: true };
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    res.status(401).json({ error: 'Invalid or expired session' });
   }
 }

@@ -7,6 +7,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   setupUser: (username: string) => Promise<void>;
+  startGoogleLogin: () => void;
   updateUsername: (username: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -23,29 +24,20 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = !!user && !!token;
+  const isAuthenticated = !!user;
 
   // Auto-login on mount: Try to get existing user from database
   useEffect(() => {
     async function initAuth(): Promise<void> {
       try {
-        // First, try auto-login from database (for local single-user app)
-        const { user: userData, token: newToken } = await authApi.auto();
+        const storedToken = localStorage.getItem(TOKEN_KEY);
+        const { user: userData, token: newToken } = await authApi.me(storedToken);
         setUser(userData);
         setToken(newToken);
         localStorage.setItem(TOKEN_KEY, newToken);
         localStorage.setItem(USER_KEY, JSON.stringify(userData));
       } catch (error: unknown) {
-        // No user in database (404) or server error - that's okay
-        // Clear any stale localStorage data
-        const err = error as { message?: string };
-        if (err.message?.startsWith('404:')) {
-          // No user exists yet - frontend will show username setup
-          console.log('No user in database, need to set up username');
-        } else {
-          console.warn('Auto-login failed:', error);
-        }
-        // Clear stale data
+        console.warn('Session restore failed:', error);
         setToken(null);
         setUser(null);
         localStorage.removeItem(TOKEN_KEY);
@@ -66,6 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     localStorage.setItem(USER_KEY, JSON.stringify(userData));
   }, []);
 
+  const startGoogleLogin = useCallback((): void => {
+    window.location.assign(authApi.googleStartUrl);
+  }, []);
+
   const updateUsername = useCallback(async (username: string): Promise<void> => {
     if (!token) throw new Error('Not authenticated');
     const { user: userData, token: newToken } = await authApi.updateUsername(username, token);
@@ -84,10 +80,11 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   }, []);
 
   const refreshUser = useCallback(async (): Promise<void> => {
-    if (!token) return;
     try {
-      const { user: userData } = await authApi.me(token);
+      const { user: userData, token: newToken } = await authApi.me(token);
       setUser(userData);
+      setToken(newToken);
+      localStorage.setItem(TOKEN_KEY, newToken);
       localStorage.setItem(USER_KEY, JSON.stringify(userData));
     } catch (error) {
       console.error('Failed to refresh user:', error);
@@ -100,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     isLoading,
     isAuthenticated,
     setupUser,
+    startGoogleLogin,
     updateUsername,
     logout,
     refreshUser,
