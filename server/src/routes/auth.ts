@@ -13,6 +13,7 @@ import {
   readCookie,
   userSelectFields,
 } from '../services/authSessions.js';
+import { recordSignupGrantIfMissing } from '../services/credits.js';
 
 const router = Router();
 
@@ -113,6 +114,7 @@ async function upsertGoogleUser(profile: GoogleProfile) {
   );
 
   const newUser = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [userId]);
+  recordSignupGrantIfMissing(userId);
   return newUser.rows[0];
 }
 
@@ -190,6 +192,7 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
         [userId]
       );
       user = newUser.rows[0];
+      recordSignupGrantIfMissing(userId);
     }
 
     // Generate token
@@ -229,6 +232,7 @@ router.post('/local-dev', async (req: Request<object, object, Partial<SetupBody>
       );
       const created = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [userId]);
       user = created.rows[0];
+      recordSignupGrantIfMissing(userId);
     }
 
     await createLocalSession(user, res);

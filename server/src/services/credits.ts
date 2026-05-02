@@ -138,6 +138,28 @@ export function recordCreditLedgerEntry(params: {
   );
 }
 
+export function recordSignupGrantIfMissing(userId: string): void {
+  const existing = db.prepare(
+    `SELECT 1
+     FROM credit_ledger
+     WHERE user_id = ? AND reason = 'signup_grant'
+     LIMIT 1`
+  ).get(userId);
+
+  if (existing) return;
+
+  const summary = getCreditSummary(userId);
+  if (summary.balance <= 0) return;
+
+  recordCreditLedgerEntry({
+    userId,
+    delta: CREDIT_AMOUNTS.signupGrant,
+    balanceAfter: summary.balance,
+    reason: 'signup_grant',
+    metadata: { source: 'account_created' },
+  });
+}
+
 export function reserveCredits(params: {
   userId: string;
   amount: number;
