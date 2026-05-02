@@ -204,6 +204,15 @@ CREATE TABLE IF NOT EXISTS reports (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS rate_limits (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  reset_at INTEGER NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, action)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_songs_user_id ON songs(user_id);
 CREATE INDEX IF NOT EXISTS idx_songs_created_at ON songs(created_at);
@@ -232,6 +241,7 @@ CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks(blocker_id);
 CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id);
 CREATE INDEX IF NOT EXISTS idx_reports_target ON reports(target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_at ON rate_limits(reset_at);
 `;
 
 function getTableColumns(tableName: string): Set<string> {

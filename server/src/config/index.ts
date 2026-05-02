@@ -43,6 +43,10 @@ export const config = {
     provider: (process.env.FORMAT_PROVIDER || 'auto') as 'auto' | 'gemini' | 'openai',
   },
 
+  product: {
+    timeZone: process.env.PRODUCT_TIME_ZONE || process.env.TZ || 'Europe/Bratislava',
+  },
+
   // Frontend URL
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 

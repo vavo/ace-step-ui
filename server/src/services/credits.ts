@@ -1,4 +1,5 @@
 import { db, generateUUID, transaction } from '../db/sqlite.js';
+import { config } from '../config/index.js';
 import { awardBadge } from './gamification.js';
 
 export const CREDIT_AMOUNTS = {
@@ -160,6 +161,39 @@ export function recordSignupGrantIfMissing(userId: string): void {
   });
 }
 
+export function backfillSignupGrantLedger(): number {
+  const rows = db.prepare(
+    `SELECT u.id, u.created_at
+     FROM users u
+     WHERE u.credit_balance = ?
+       AND NOT EXISTS (
+         SELECT 1 FROM credit_ledger cl
+         WHERE cl.user_id = u.id
+       )`
+  ).all(CREDIT_AMOUNTS.signupGrant) as Array<{ id: string; created_at: string | null }>;
+
+  const insert = db.prepare(
+    `INSERT INTO credit_ledger
+       (id, user_id, delta, balance_after, reason, reference_type, reference_id, metadata, created_at)
+     VALUES (?, ?, ?, ?, 'signup_grant', NULL, NULL, ?, COALESCE(?, datetime('now')))`
+  );
+
+  transaction(() => {
+    for (const row of rows) {
+      insert.run(
+        generateUUID(),
+        row.id,
+        CREDIT_AMOUNTS.signupGrant,
+        CREDIT_AMOUNTS.signupGrant,
+        JSON.stringify({ source: 'legacy_backfill' }),
+        row.created_at
+      );
+    }
+  });
+
+  return rows.length;
+}
+
 export function reserveCredits(params: {
   userId: string;
   amount: number;
@@ -217,7 +251,27 @@ export function refundCredits(params: {
 }
 
 function dateKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: config.product.timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+  } catch {
+    parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+  }
+
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
 }
 
 function daysBetween(first: string, second: string): number {

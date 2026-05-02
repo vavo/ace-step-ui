@@ -31,6 +31,12 @@ import lyricsRoutes from './routes/lyrics.js';
 import socialRoutes from './routes/social.js';
 import { pool } from './db/pool.js';
 import './db/migrate.js';
+import { backfillSignupGrantLedger } from './services/credits.js';
+
+const signupGrantBackfillCount = backfillSignupGrantLedger();
+if (signupGrantBackfillCount > 0) {
+  console.log(`Backfilled signup credit ledger entries: ${signupGrantBackfillCount}`);
+}
 
 const app = express();
 
