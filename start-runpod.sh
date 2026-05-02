@@ -4,6 +4,16 @@
 
 set -e
 
+# Load root .env if present (keeps PORT / FRONTEND_URL / JWT etc in effect)
+if [ -f .env ]; then
+  # shellcheck disable=SC1090
+  set -a
+  . ./.env
+  set +a
+fi
+
+PORT="${PORT:-4444}"
+
 echo "=================================="
 echo "  ACE-Step UI - RunPod Startup"
 echo "=================================="
@@ -79,10 +89,10 @@ if ! kill -0 $API_PID 2>/dev/null; then
     exit 1
 fi
 
-# Start Express on port 4444 (external)
-echo "[2/2] Starting Express server on port 4444 (external)..."
+# Start Express on configured external port
+echo "[2/2] Starting Express server on port ${PORT} (external)..."
 cd server
-NODE_ENV=production npm run dev > ../logs/express.log 2>&1 &
+NODE_ENV="${NODE_ENV}" PORT="${PORT}" npm run dev > ../logs/express.log 2>&1 &
 EXPRESS_PID=$!
 cd ..
 
@@ -103,9 +113,9 @@ echo "  All Services Running!"
 echo "=================================="
 echo
 echo "  ACE-Step API:  http://localhost:8001 (internal)"
-echo "  Express:       http://0.0.0.0:4444 (external)"
+echo "  Express:       http://0.0.0.0:${PORT} (external)"
 echo
-echo "  Access the app at: http://<RUNPOD-IP>:4444"
+echo "  Access the app at: http://<RUNPOD-IP>:${PORT}"
 echo
 echo "  Logs: ./logs/"
 echo

@@ -414,7 +414,7 @@ app.get('/api/search', async (req, res) => {
 
 // Serve React frontend (production build)
 if (config.nodeEnv === 'production') {
-  const distPath = path.join(__dirname_init, '../dist');
+  const distPath = path.join(__dirname_init, '../../dist');
   app.use(express.static(distPath));
 
   // SPA fallback - serve index.html for all non-API routes
