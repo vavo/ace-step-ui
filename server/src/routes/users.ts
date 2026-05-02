@@ -363,6 +363,18 @@ router.post('/:username/follow', authMiddleware, async (req: AuthenticatedReques
             return;
         }
 
+        const blockCheck = await pool.query(
+            `SELECT 1 FROM user_blocks
+             WHERE (blocker_id = $1 AND blocked_id = $2)
+                OR (blocker_id = $2 AND blocked_id = $1)
+             LIMIT 1`,
+            [currentUserId, targetUserId]
+        );
+        if (blockCheck.rows.length > 0) {
+            res.status(403).json({ error: 'Follow is blocked' });
+            return;
+        }
+
         // Check if already following
         const existingFollow = await pool.query(
             'SELECT 1 FROM followers WHERE follower_id = $1 AND following_id = $2',

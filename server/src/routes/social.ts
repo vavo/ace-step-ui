@@ -3,7 +3,7 @@ import { pool } from '../db/pool.js';
 import { generateUUID } from '../db/sqlite.js';
 import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
-import { getUserBadges, getWeekStart } from '../services/gamification.js';
+import { awardBadge, getUserBadges, getWeekStart } from '../services/gamification.js';
 import { checkRateLimit } from '../services/rateLimit.js';
 
 const router = Router();
@@ -192,21 +192,29 @@ router.get('/leaderboards', optionalAuthMiddleware, async (req: AuthenticatedReq
     );
 
     const songs = await Promise.all(songResult.rows.map(mapFeedSong));
-    const creators = creatorResult.rows.map((row, index) => ({
-      id: row.id,
-      username: row.username,
-      avatar_url: row.avatar_url,
-      bio: row.bio,
-      xp: row.xp ?? 0,
-      level: row.level ?? 1,
-      rank: index + 1,
-      published_song_count: row.published_song_count ?? 0,
-      likes_received: row.likes_received ?? 0,
-      follower_growth: row.follower_growth ?? 0,
-      event_points: row.event_points ?? 0,
-      leaderboard_score: row.leaderboard_score ?? 0,
-      badges: getUserBadges(row.id),
-    }));
+    const creators = creatorResult.rows.map((row, index) => {
+      const rank = index + 1;
+      const leaderboardScore = row.leaderboard_score ?? 0;
+      if (rank <= 10 && leaderboardScore > 0) {
+        awardBadge(row.id, 'weekly_top_10', { periodStart, rank, leaderboardScore });
+      }
+
+      return {
+        id: row.id,
+        username: row.username,
+        avatar_url: row.avatar_url,
+        bio: row.bio,
+        xp: row.xp ?? 0,
+        level: row.level ?? 1,
+        rank,
+        published_song_count: row.published_song_count ?? 0,
+        likes_received: row.likes_received ?? 0,
+        follower_growth: row.follower_growth ?? 0,
+        event_points: row.event_points ?? 0,
+        leaderboard_score: leaderboardScore,
+        badges: getUserBadges(row.id),
+      };
+    });
 
     res.json({
       period,

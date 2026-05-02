@@ -1,4 +1,5 @@
 import { db, generateUUID, transaction } from '../db/sqlite.js';
+import { awardBadge } from './gamification.js';
 
 export const CREDIT_AMOUNTS = {
   signupGrant: 100,
@@ -239,6 +240,10 @@ export function claimDailyCredits(userId: string, now = new Date()): DailyClaimR
       reason: 'daily_claim',
       metadata: { streakDays: nextStreakDays, streakBonus },
     });
+
+    if (nextStreakDays >= 7) {
+      awardBadge(userId, 'seven_day_streak', { streakDays: nextStreakDays });
+    }
 
     return {
       balance: nextBalance,
