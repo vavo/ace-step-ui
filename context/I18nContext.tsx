@@ -9,10 +9,14 @@ interface I18nContextType {
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
+const isValidLanguage = (value: string | null): value is Language => {
+  return value === 'zh' || value === 'en' || value === 'ja' || value === 'ko' || value === 'sk';
+};
+
 export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>(() => {
-    const stored = localStorage.getItem('language') as Language;
-    return stored === 'zh' || stored === 'en' || stored === 'ja' || stored === 'ko' || stored === 'sk' ? stored : 'sk';
+    const stored = localStorage.getItem('language');
+    return isValidLanguage(stored) ? stored : 'sk';
   });
 
   const handleSetLanguage = (lang: Language) => {
