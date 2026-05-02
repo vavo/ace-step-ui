@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Song } from '../types';
-import { songsApi, getAudioUrl } from '../services/api';
+import { songsApi, getAudioUrl, socialApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { ArrowLeft, Play, Pause, Heart, Share2, MoreHorizontal, ThumbsDown, Music as MusicIcon, Edit3, Eye } from 'lucide-react';
@@ -89,6 +89,7 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
     const [loading, setLoading] = useState(true);
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
+    const [reportSubmitted, setReportSubmitted] = useState(false);
 
     const isCurrentSong = song && currentSong?.id === song.id;
     const isCurrentlyPlaying = isCurrentSong && isPlaying;
@@ -136,6 +137,16 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleReportSong = async () => {
+        if (!song || !token) return;
+        await socialApi.report({
+            targetType: 'song',
+            targetId: song.id,
+            reason: 'other',
+        }, token);
+        setReportSubmitted(true);
     };
 
     if (loading) {
@@ -286,6 +297,16 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                             >
                                 <Share2 size={16} className="text-zinc-700 dark:text-white" />
                             </button>
+                            {token && user?.id !== song.userId && (
+                                <button
+                                    onClick={() => void handleReportSong()}
+                                    disabled={reportSubmitted}
+                                    className="p-2 bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-60"
+                                    title={reportSubmitted ? t('reported') : t('reportSong')}
+                                >
+                                    <ThumbsDown size={16} className="text-zinc-700 dark:text-white" />
+                                </button>
+                            )}
                             <div className="relative">
                                 <button
                                     onClick={() => setShowDropdown(!showDropdown)}

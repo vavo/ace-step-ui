@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Song, Playlist } from '../types';
-import { usersApi, getAudioUrl, UserProfile as UserProfileType, songsApi } from '../services/api';
+import { usersApi, getAudioUrl, UserProfile as UserProfileType, songsApi, socialApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Play, Pause, Heart, Eye, Users, Music as MusicIcon, ChevronRight, Share2, MoreHorizontal, Edit3, X, Camera, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Heart, Eye, Users, Music as MusicIcon, ChevronRight, Share2, MoreHorizontal, Edit3, X, Camera, Image as ImageIcon, Upload, Loader2, Ban, AlertTriangle, Star } from 'lucide-react';
 import { localeForLanguage, useI18n } from '../context/I18nContext';
 
 interface UserProfileProps {
@@ -25,6 +25,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
     const [publicPlaylists, setPublicPlaylists] = useState<Playlist[]>([]);
     const [songsTab, setSongsTab] = useState<'recent' | 'top'>('recent');
     const [loading, setLoading] = useState(true);
+    const [showSafetyMenu, setShowSafetyMenu] = useState(false);
 
     // Edit State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -153,6 +154,23 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
             setUploadingAvatar(false);
             setUploadingBanner(false);
         }
+    };
+
+    const handleReportUser = async () => {
+        if (!profileUser || !token) return;
+        await socialApi.report({
+            targetType: 'user',
+            targetId: profileUser.id,
+            reason: 'other',
+        }, token);
+        setShowSafetyMenu(false);
+    };
+
+    const handleBlockUser = async () => {
+        if (!profileUser || !token) return;
+        await socialApi.blockUser(profileUser.username, token);
+        setShowSafetyMenu(false);
+        onBack();
     };
 
     if (loading) {
@@ -384,10 +402,46 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                                         {t('editProfile')}
                                     </button>
                                 )}
+                                {!isOwner && token && (
+                                    <div className="relative self-start md:self-auto">
+                                        <button
+                                            onClick={() => setShowSafetyMenu(!showSafetyMenu)}
+                                            className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 flex items-center justify-center transition-colors"
+                                            title={t('more')}
+                                        >
+                                            <MoreHorizontal size={18} />
+                                        </button>
+                                        {showSafetyMenu && (
+                                            <div className="absolute right-0 top-12 z-30 w-44 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-xl py-1">
+                                                <button
+                                                    onClick={() => void handleReportUser()}
+                                                    className="w-full px-3 py-2 text-left text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center gap-2"
+                                                >
+                                                    <AlertTriangle size={14} />
+                                                    {t('reportUser')}
+                                                </button>
+                                                <button
+                                                    onClick={() => void handleBlockUser()}
+                                                    className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-300 hover:bg-red-500/10 flex items-center gap-2"
+                                                >
+                                                    <Ban size={14} />
+                                                    {t('blockUser')}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Stats */}
                             <div className="flex items-center gap-4 md:gap-6 text-sm pt-2 border-t border-zinc-200 dark:border-white/10 mt-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 md:gap-2">
+                                    <Star size={16} className="text-zinc-500 dark:text-zinc-400" />
+                                    <span className="font-semibold text-zinc-900 dark:text-white">{profileUser.level || 1}</span>
+                                    <span className="text-zinc-500 dark:text-zinc-400">{t('level')}</span>
+                                    <span className="text-zinc-400 dark:text-zinc-600">·</span>
+                                    <span className="text-zinc-500 dark:text-zinc-400">{profileUser.xp || 0} {t('xp')}</span>
+                                </div>
                                 <div className="flex items-center gap-1.5 md:gap-2">
                                     <MusicIcon size={16} className="text-zinc-500 dark:text-zinc-400" />
                                     <span className="font-semibold text-zinc-900 dark:text-white">{publicSongs.length}</span>
