@@ -3,16 +3,12 @@ import multer from 'multer';
 import path from 'path';
 import os from 'os';
 import { promises as fs } from 'fs';
-import { fileURLToPath } from 'url';
 import { pool } from '../db/pool.js';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
 import { spawn } from 'child_process';
 
 const router = Router();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const AUDIO_DIR = path.join(__dirname, '../../public/audio');
 
 const upload = multer({
   storage: multer.memoryStorage(),

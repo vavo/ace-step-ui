@@ -21,7 +21,6 @@ import { PlaylistDetail } from './components/PlaylistDetail';
 import { Toast, ToastType } from './components/Toast';
 import { SearchPage } from './components/SearchPage';
 import { TrainingPanel } from './components/TrainingPanel';
-import { NewsPage } from './components/NewsPage';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
 
@@ -286,8 +285,6 @@ function AppContent() {
         }
       } else if (path === '/search') {
         setCurrentView('search');
-      } else if (path === '/news') {
-        setCurrentView('news');
       }
     };
 
@@ -1296,9 +1293,6 @@ function AppContent() {
       case 'training':
         return <TrainingPanel />;
 
-      case 'news':
-        return <NewsPage />;
-
       case 'create':
       default:
         return (
@@ -1401,8 +1395,6 @@ function AppContent() {
               window.history.pushState({}, '', '/library');
             } else if (v === 'search') {
               window.history.pushState({}, '', '/search');
-            } else if (v === 'news') {
-              window.history.pushState({}, '', '/news');
             }
             if (isMobile) setShowLeftSidebar(false);
           }}

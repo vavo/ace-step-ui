@@ -24,7 +24,7 @@ import { getGradioClient, resetGradioClient, isGradioAvailable } from './gradio-
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const AUDIO_DIR = path.join(__dirname, '../../public/audio');
+const AUDIO_DIR = config.storage.audioDir;
 
 const ACESTEP_API = config.acestep.apiUrl;
 

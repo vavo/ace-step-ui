@@ -94,7 +94,7 @@ app.use('/acestep-api', createProxyMiddleware({
 }));
 
 // Serve static audio files
-app.use('/audio', express.static(path.join(__dirname, '../public/audio')));
+app.use('/audio', express.static(config.storage.audioDir));
 
 // Audio Editor (AudioMass) - needs relaxed CSP for inline scripts and external images
 app.use('/editor', (req, res, next) => {
