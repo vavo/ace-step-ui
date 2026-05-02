@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Song, Playlist } from '../types';
 import { usersApi, getAudioUrl, UserProfile as UserProfileType, songsApi, socialApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Play, Pause, Heart, Eye, Users, Music as MusicIcon, ChevronRight, Share2, MoreHorizontal, Edit3, X, Camera, Image as ImageIcon, Upload, Loader2, Ban, AlertTriangle, Star } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Heart, Eye, Users, Music as MusicIcon, ChevronRight, Share2, MoreHorizontal, Edit3, X, Camera, Image as ImageIcon, Upload, Loader2, Ban, AlertTriangle } from 'lucide-react';
 import { localeForLanguage, useI18n } from '../context/I18nContext';
+import { EmptyState } from './EmptyState';
+import { ProfileProgressCard } from './ProfileProgressCard';
 
 interface UserProfileProps {
     username: string;
@@ -464,15 +466,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                                 )}
                             </div>
 
+                            <ProfileProgressCard
+                                level={profileUser.level || 1}
+                                xp={profileUser.xp || 0}
+                                badges={profileUser.badges || []}
+                            />
+
                             {/* Stats */}
-                            <div className="flex items-center gap-4 md:gap-6 text-sm pt-2 border-t border-zinc-200 dark:border-white/10 mt-2 flex-wrap">
-                                <div className="flex items-center gap-1.5 md:gap-2">
-                                    <Star size={16} className="text-zinc-500 dark:text-zinc-400" />
-                                    <span className="font-semibold text-zinc-900 dark:text-white">{profileUser.level || 1}</span>
-                                    <span className="text-zinc-500 dark:text-zinc-400">{t('level')}</span>
-                                    <span className="text-zinc-400 dark:text-zinc-600">·</span>
-                                    <span className="text-zinc-500 dark:text-zinc-400">{profileUser.xp || 0} {t('xp')}</span>
-                                </div>
+                            <div className="flex items-center gap-4 md:gap-6 text-sm pt-3 border-t border-zinc-200 dark:border-white/10 mt-4 flex-wrap">
                                 <div className="flex items-center gap-1.5 md:gap-2">
                                     <MusicIcon size={16} className="text-zinc-500 dark:text-zinc-400" />
                                     <span className="font-semibold text-zinc-900 dark:text-white">{publicSongs.length}</span>
@@ -587,10 +588,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                     </div>
 
                     {displaySongs.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
-                            <MusicIcon size={64} className="mb-4 opacity-50" />
-                            <p>{t('noPublicSongsYet')}</p>
-                        </div>
+                        <EmptyState icon={<MusicIcon size={26} />} title={t('noPublicSongsYet')} />
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
                             {displaySongs.map((song) => {

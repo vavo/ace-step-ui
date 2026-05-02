@@ -1344,6 +1344,7 @@ function AppContent() {
             onToggleLike={toggleLike}
             onNavigateToProfile={handleNavigateToProfile}
             onNavigateToSong={handleNavigateToSong}
+            onNavigateToCreate={() => handleNavigate('create')}
           />
         );
 
@@ -1355,6 +1356,7 @@ function AppContent() {
             isPlaying={isPlaying}
             onNavigateToProfile={handleNavigateToProfile}
             onNavigateToSong={handleNavigateToSong}
+            onNavigateToCreate={() => handleNavigate('create')}
           />
         );
 

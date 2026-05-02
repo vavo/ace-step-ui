@@ -4,6 +4,7 @@ import { Song } from '../types';
 import { socialApi, Song as ApiSong, LeaderboardsResponse } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
+import { EmptyState } from './EmptyState';
 
 interface LeaderboardPageProps {
   currentSong?: Song | null;
@@ -11,6 +12,7 @@ interface LeaderboardPageProps {
   onPlaySong?: (song: Song, list?: Song[]) => void;
   onNavigateToProfile?: (username: string) => void;
   onNavigateToSong?: (songId: string) => void;
+  onNavigateToCreate?: () => void;
 }
 
 type RankedSong = Song & {
@@ -44,6 +46,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
   onPlaySong,
   onNavigateToProfile,
   onNavigateToSong,
+  onNavigateToCreate,
 }) => {
   const { token } = useAuth();
   const { t } = useI18n();
@@ -130,9 +133,13 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
         {activeTab === 'songs' && (
           <div className="space-y-3">
             {songs.length === 0 ? (
-              <div className="border border-dashed border-zinc-300 dark:border-white/10 rounded-lg p-8 text-center text-zinc-500 dark:text-zinc-400">
-                {t('leaderboardEmpty')}
-              </div>
+              <EmptyState
+                icon={<Trophy size={22} />}
+                title={t('leaderboardEmpty')}
+                body={t('leaderboardEmptyBody')}
+                actionLabel={onNavigateToCreate ? t('createFirstSong') : undefined}
+                onAction={onNavigateToCreate}
+              />
             ) : songs.map((song, index) => {
               const active = currentSong?.id === song.id;
               return (
@@ -185,9 +192,13 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
         {activeTab === 'creators' && (
           <div className="space-y-3">
             {!data?.creators.length ? (
-              <div className="border border-dashed border-zinc-300 dark:border-white/10 rounded-lg p-8 text-center text-zinc-500 dark:text-zinc-400">
-                {t('leaderboardEmpty')}
-              </div>
+              <EmptyState
+                icon={<Users size={22} />}
+                title={t('leaderboardEmpty')}
+                body={t('leaderboardEmptyBody')}
+                actionLabel={onNavigateToCreate ? t('createFirstSong') : undefined}
+                onAction={onNavigateToCreate}
+              />
             ) : data.creators.map((creator) => (
               <button
                 key={creator.id}

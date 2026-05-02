@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Ban, Heart, Loader2, MessageCircle, MoreHorizontal, Play, RefreshCw, UserRound } from 'lucide-react';
+import { AlertTriangle, Ban, Heart, Loader2, MessageCircle, MoreHorizontal, Music2, Play, RefreshCw, UserRound } from 'lucide-react';
 import { Song } from '../types';
 import { socialApi, Song as ApiSong } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
+import { EmptyState } from './EmptyState';
 
 interface FeedPageProps {
   currentSong?: Song | null;
@@ -13,6 +14,7 @@ interface FeedPageProps {
   onToggleLike?: (songId: string) => void;
   onNavigateToProfile?: (username: string) => void;
   onNavigateToSong?: (songId: string) => void;
+  onNavigateToCreate?: () => void;
 }
 
 type FeedSong = Song & {
@@ -52,6 +54,7 @@ export const FeedPage: React.FC<FeedPageProps> = ({
   onToggleLike,
   onNavigateToProfile,
   onNavigateToSong,
+  onNavigateToCreate,
 }) => {
   const { token, isAuthenticated } = useAuth();
   const { t } = useI18n();
@@ -193,9 +196,13 @@ export const FeedPage: React.FC<FeedPageProps> = ({
         )}
 
         {songs.length === 0 ? (
-          <div className="border border-dashed border-zinc-300 dark:border-white/10 rounded-lg p-8 text-center text-zinc-500 dark:text-zinc-400">
-            {t('feedEmpty')}
-          </div>
+          <EmptyState
+            icon={<Music2 size={22} />}
+            title={t('feedEmpty')}
+            body={t('feedEmptyBody')}
+            actionLabel={onNavigateToCreate ? t('createFirstSong') : undefined}
+            onAction={onNavigateToCreate}
+          />
         ) : (
           <div className="space-y-4">
             {songs.map(song => {
