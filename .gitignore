@@ -95,8 +95,4 @@ wavacity-editor/
 # Script logs
 logs/
 
-# Local implementation plan
-docs/devplan.md
-docs/multi-user-mvp-plan.md
-
 *.yml
