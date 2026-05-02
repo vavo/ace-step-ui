@@ -6,9 +6,10 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const defaultPort = process.env.PORT || '3001';
 
 export const config = {
-  port: parseInt(process.env.PORT || '4444', 10),
+  port: parseInt(defaultPort, 10),
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // SQLite database
@@ -46,7 +47,7 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:4444',
 
   auth: {
-    publicApiUrl: process.env.PUBLIC_API_URL || process.env.SERVER_PUBLIC_URL || '',
+    publicApiUrl: process.env.PUBLIC_API_URL || process.env.SERVER_PUBLIC_URL || `http://localhost:${defaultPort}`,
     googleClientId: process.env.GOOGLE_CLIENT_ID || '',
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     googleCallbackUrl: process.env.GOOGLE_OAUTH_CALLBACK_URL || '',
