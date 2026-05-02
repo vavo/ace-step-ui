@@ -1,8 +1,8 @@
 export type Language = 'en' | 'zh' | 'ja' | 'ko' | 'sk';
 
 type TranslationBundle = Record<string, string>;
-export const translations: Record<string, TranslationBundle> = {
-  en: {
+
+const enTranslations: TranslationBundle = {
     // Navigation
     create: 'Create',
     library: 'Library',
@@ -603,7 +603,10 @@ export const translations: Record<string, TranslationBundle> = {
     editableUsedForTraining: 'editable, used for training',
     useGlobalRatio: 'Use Global Ratio',
     thisSample: 'this sample',
-  },
+};
+
+export const translations: Record<string, TranslationBundle> = {
+  en: enTranslations,
   zh: {
     // Navigation
     create: '创作',
@@ -2397,7 +2400,7 @@ export const translations: Record<string, TranslationBundle> = {
     thisSample: '이 샘플',
   },
   sk: {
-    ...translations.en,
+    ...enTranslations,
     create: 'Vytvoriť',
     library: 'Knižnica',
     search: 'Vyhľadávanie',
