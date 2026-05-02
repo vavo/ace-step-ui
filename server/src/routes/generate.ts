@@ -20,6 +20,13 @@ import {
 } from '../services/acestep.js';
 import { getStorageProvider } from '../services/storage/factory.js';
 import { isGradioAvailable } from '../services/gradio-client.js';
+import {
+  calculateGenerationCreditCost,
+  getCreditSummary,
+  InsufficientCreditsError,
+  refundCredits,
+  reserveCredits,
+} from '../services/credits.js';
 
 const router = Router();
 
@@ -516,6 +523,10 @@ router.post('/upload-audio', authMiddleware, (req: AuthenticatedRequest, res: Re
 });
 
 router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  let localJobId: string | null = null;
+  let creditCost = 0;
+  let creditsReserved = false;
+
   try {
     const {
       customMode,
@@ -643,16 +654,62 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       ditModel,
     };
 
+    creditCost = calculateGenerationCreditCost(batchSize);
+    const creditSummary = getCreditSummary(req.user!.id);
+    if (creditSummary.balance < creditCost) {
+      res.status(402).json({
+        error: 'Insufficient credits',
+        creditBalance: creditSummary.balance,
+        creditsRequired: creditCost,
+      });
+      return;
+    }
+
     // Create job record in database
-    const localJobId = generateUUID();
+    localJobId = generateUUID();
     await pool.query(
-      `INSERT INTO generation_jobs (id, user_id, status, params, created_at, updated_at)
-       VALUES (?, ?, 'queued', ?, datetime('now'), datetime('now'))`,
-      [localJobId, req.user!.id, JSON.stringify(params)]
+      `INSERT INTO generation_jobs (id, user_id, status, params, credit_cost, created_at, updated_at)
+       VALUES (?, ?, 'queued', ?, ?, datetime('now'), datetime('now'))`,
+      [localJobId, req.user!.id, JSON.stringify(params), creditCost]
+    );
+
+    reserveCredits({
+      userId: req.user!.id,
+      amount: creditCost,
+      referenceType: 'generation_job',
+      referenceId: localJobId,
+      metadata: { batchSize: batchSize || 1 },
+    });
+    creditsReserved = true;
+
+    await pool.query(
+      `UPDATE generation_jobs SET credits_reserved = 1, updated_at = datetime('now') WHERE id = ?`,
+      [localJobId]
     );
 
     // Start generation
-    const { jobId: hfJobId } = await generateMusicViaAPI(params);
+    let hfJobId: string;
+    try {
+      const result = await generateMusicViaAPI(params);
+      hfJobId = result.jobId;
+    } catch (startError) {
+      if (creditsReserved) {
+        refundCredits({
+          userId: req.user!.id,
+          amount: creditCost,
+          referenceType: 'generation_job',
+          referenceId: localJobId,
+          metadata: { reason: 'generation_start_failed' },
+        });
+        await pool.query(
+          `UPDATE generation_jobs
+           SET status = 'failed', error = ?, credits_refunded = 1, updated_at = datetime('now')
+           WHERE id = ?`,
+          [startError instanceof Error ? startError.message : 'Generation failed to start', localJobId]
+        );
+      }
+      throw startError;
+    }
 
     // Update job with ACE-Step task ID
     await pool.query(
@@ -664,9 +721,18 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       jobId: localJobId,
       status: 'queued',
       queuePosition: 1,
+      creditsReserved: creditCost,
     });
   } catch (error) {
     console.error('Generate error:', error);
+    if (error instanceof InsufficientCreditsError) {
+      res.status(402).json({
+        error: error.message,
+        creditBalance: error.balance,
+        creditsRequired: error.required,
+      });
+      return;
+    }
     res.status(500).json({ error: (error as Error).message || 'Generation failed' });
   }
 });
@@ -674,7 +740,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
 router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const jobResult = await pool.query(
-      `SELECT id, user_id, acestep_task_id, status, params, result, error, created_at
+      `SELECT id, user_id, acestep_task_id, status, params, result, error, credit_cost, credits_reserved, credits_refunded, created_at
        FROM generation_jobs
        WHERE id = ?`,
       [req.params.jobId]
@@ -715,6 +781,20 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
 
           const updateResult = await pool.query(updateQuery, updateParams);
           const wasUpdated = updateResult.rowCount > 0;
+
+          if (aceStatus.status === 'failed' && wasUpdated && job.credits_reserved && !job.credits_refunded && job.credit_cost > 0) {
+            refundCredits({
+              userId: req.user!.id,
+              amount: job.credit_cost,
+              referenceType: 'generation_job',
+              referenceId: req.params.jobId,
+              metadata: { reason: 'generation_failed' },
+            });
+            await pool.query(
+              `UPDATE generation_jobs SET credits_refunded = 1, updated_at = datetime('now') WHERE id = ?`,
+              [req.params.jobId]
+            );
+          }
 
           // If succeeded AND we were the first to update (optimistic lock), create song records
           if (aceStatus.status === 'succeeded' && aceStatus.result && wasUpdated) {
