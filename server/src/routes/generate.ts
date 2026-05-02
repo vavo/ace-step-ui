@@ -19,6 +19,7 @@ import {
   resolvePythonPath,
 } from '../services/acestep.js';
 import { getStorageProvider } from '../services/storage/factory.js';
+import { isGradioAvailable } from '../services/gradio-client.js';
 
 const router = Router();
 
@@ -45,6 +46,98 @@ type GeminiFormatResult = {
 };
 
 type FormatProvider = 'openai' | 'gemini';
+
+const RANDOM_DESCRIPTION_FALLBACKS = [
+  'A mellow lo-fi chill track with soft piano chords and warm ambient pads.',
+  'An energetic 80s-inspired synthwave song with nostalgic arpeggios and punchy drums.',
+  'A cinematic emotional build-up with epic strings, deep bass, and delayed piano melody.',
+  'A relaxed lo-fi hip hop beat with vinyl crackle, mellow bassline, and jazzy keys.',
+  'A dynamic club-ready house track with bright leads and a steady four-on-the-floor groove.',
+  'A dreamy ambient pop song with airy vocals, reverb-heavy guitar, and sparse percussion.',
+];
+
+function getRandomDescriptionFallback() {
+  const idx = Math.floor(Math.random() * RANDOM_DESCRIPTION_FALLBACKS.length);
+  return {
+    description: RANDOM_DESCRIPTION_FALLBACKS[idx],
+    instrumental: false,
+    vocalLanguage: 'en',
+  };
+}
+
+async function resolveGradioRandomDescription() {
+  const fallback = getRandomDescriptionFallback();
+  const errorPrefix = 'Random description unavailable. Falling back to built-in suggestions.';
+
+  let client: Awaited<ReturnType<typeof getGradioClient>>;
+  try {
+    client = await getGradioClient();
+  } catch (error) {
+    console.error('Random description: failed to connect to Gradio client:', error);
+    return {
+      ...fallback,
+      fallback: true,
+      error: error instanceof Error ? `${errorPrefix} ${error.message}` : `${errorPrefix} Unknown client error.`,
+    };
+  }
+
+  const candidates = [
+    '/load_random_simple_description',
+    '/load_random_description',
+    '/random_simple_description',
+    '/random-description',
+  ];
+
+  let lastError: unknown;
+  let usedEndpoint = '';
+  for (const endpoint of candidates) {
+    try {
+      usedEndpoint = endpoint;
+      const result = await (client as any).predict(endpoint, []);
+      const data = (result as any)?.data as unknown[] | undefined;
+      if (!Array.isArray(data) || data.length < 3) {
+        lastError = new Error(`Endpoint ${endpoint} returned unexpected payload.`);
+        continue;
+      }
+
+      return {
+        description: (data[0] as string) || getRandomDescriptionFallback().description,
+        instrumental: Boolean(data[1]),
+        vocalLanguage: (data[2] as string) || 'unknown',
+        fallback: false,
+      };
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+  }
+
+  const isReady = await isGradioAvailable().catch(() => false);
+  if (!isReady) {
+    return {
+      ...fallback,
+      fallback: true,
+      error: `${errorPrefix} Gradio app is not available.`,
+    };
+  }
+
+  if (lastError instanceof Error) {
+    const detail = usedEndpoint
+      ? `Endpoints ${candidates.join(', ')} were tried; last error on ${usedEndpoint}: ${lastError.message}`
+      : `All candidate endpoints failed: ${lastError.message}`;
+    return {
+      ...fallback,
+      fallback: true,
+      error: detail,
+    };
+  }
+
+  return {
+    ...fallback,
+    fallback: true,
+    error: `${errorPrefix} Gradio app is available but no compatible endpoint was found.`,
+  };
+}
 
 function parseGeminiJson(text: string): GeminiFormatResult | null {
   if (!text) return null;
@@ -885,18 +978,27 @@ router.get('/models', async (_req, res: Response) => {
 // GET /api/generate/random-description — Load a random simple description from Gradio
 router.get('/random-description', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    const client = await getGradioClient();
-    const result = await client.predict('/load_random_simple_description', []);
-    const data = result.data as unknown[];
-    // Returns [description, instrumental, vocal_language]
-    res.json({
-      description: data[0] || '',
-      instrumental: data[1] || false,
-      vocalLanguage: data[2] || 'unknown',
-    });
+    const randomDescription = await resolveGradioRandomDescription();
+    const payload = {
+      description: randomDescription.description,
+      instrumental: randomDescription.instrumental,
+      vocalLanguage: randomDescription.vocalLanguage,
+      fallback: randomDescription.fallback,
+    };
+    if (randomDescription.error) {
+      (payload as Record<string, unknown>).error = randomDescription.error;
+    }
+    res.json(payload);
   } catch (error) {
+    const fallback = getRandomDescriptionFallback();
     console.error('Random description error:', error);
-    res.status(500).json({ error: (error as Error).message });
+    res.status(500).json({
+      description: fallback.description,
+      instrumental: fallback.instrumental,
+      vocalLanguage: fallback.vocalLanguage,
+      fallback: true,
+      error: error instanceof Error ? error.message : 'Unknown random description error',
+    });
   }
 });
 
