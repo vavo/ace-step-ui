@@ -23,6 +23,7 @@ import { Toast, ToastType } from './components/Toast';
 import { SearchPage } from './components/SearchPage';
 import { TrainingPanel } from './components/TrainingPanel';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { FeedPage } from './components/FeedPage';
 
 
 function AppContent() {
@@ -275,6 +276,8 @@ function AppContent() {
         setMobileShowList(false);
       } else if (path === '/library') {
         setCurrentView('library');
+      } else if (path === '/feed') {
+        setCurrentView('feed');
       } else if (path.startsWith('/@')) {
         const username = path.substring(2);
         if (username) {
@@ -1300,6 +1303,19 @@ function AppContent() {
           />
         );
 
+      case 'feed':
+        return (
+          <FeedPage
+            onPlaySong={playSong}
+            currentSong={currentSong}
+            isPlaying={isPlaying}
+            likedSongIds={likedSongIds}
+            onToggleLike={toggleLike}
+            onNavigateToProfile={handleNavigateToProfile}
+            onNavigateToSong={handleNavigateToSong}
+          />
+        );
+
       case 'training':
         return <TrainingPanel />;
 
@@ -1403,6 +1419,8 @@ function AppContent() {
               window.history.pushState({}, '', '/');
             } else if (v === 'library') {
               window.history.pushState({}, '', '/library');
+            } else if (v === 'feed') {
+              window.history.pushState({}, '', '/feed');
             } else if (v === 'search') {
               window.history.pushState({}, '', '/search');
             }

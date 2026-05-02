@@ -1,5 +1,5 @@
 import React from 'react';
-import { Library, Disc, Search, LogIn, LogOut, Sun, Moon, GraduationCap } from 'lucide-react';
+import { Library, Disc, Search, LogIn, LogOut, Sun, Moon, GraduationCap, Radio } from 'lucide-react';
 import { View } from '../types';
 import { useI18n } from '../context/I18nContext';
 
@@ -95,6 +95,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label={t('library')}
           active={currentView === 'library'}
           onClick={() => onNavigate('library')}
+          isExpanded={isOpen}
+        />
+        <NavItem
+          icon={<Radio size={20} />}
+          label={t('feed')}
+          active={currentView === 'feed'}
+          onClick={() => onNavigate('feed')}
           isExpanded={isOpen}
         />
         <NavItem
