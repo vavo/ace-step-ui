@@ -433,6 +433,50 @@ export const generateApi = {
   }> => api('/api/lora/status', { token }),
 };
 
+export const creditsApi = {
+  getBalance: (token: string): Promise<{
+    credits: {
+      balance: number;
+      lastDailyClaimAt: string | null;
+      streakDays: number;
+    };
+    costs: {
+      lyricsDraft: number;
+      generationVariation: number;
+    };
+    daily: {
+      claimAmount: number;
+      freeBalanceCap: number;
+      streakBonusStep: number;
+      streakBonusMax: number;
+    };
+  }> => api('/api/credits/balance', { token }),
+
+  getLedger: (token: string, limit = 50): Promise<{
+    entries: Array<{
+      id: string;
+      delta: number;
+      balanceAfter: number;
+      reason: string;
+      referenceType: string | null;
+      referenceId: string | null;
+      metadata: Record<string, unknown> | null;
+      createdAt: string;
+    }>;
+  }> => api(`/api/credits/ledger?limit=${encodeURIComponent(String(limit))}`, { token }),
+
+  claimDaily: (token: string): Promise<{
+    credits: {
+      balance: number;
+      lastDailyClaimAt: string | null;
+      streakDays: number;
+      claimed: boolean;
+      grantAmount: number;
+      reason?: string;
+    };
+  }> => api('/api/credits/claim-daily', { method: 'POST', token }),
+};
+
 // Users API
 export interface UserProfile extends User {
   bio?: string;

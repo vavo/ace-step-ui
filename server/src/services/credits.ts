@@ -41,6 +41,23 @@ export type CreditSummary = {
   streakDays: number;
 };
 
+export type CreditLedgerEntry = {
+  id: string;
+  delta: number;
+  balanceAfter: number;
+  reason: CreditReason;
+  referenceType: string | null;
+  referenceId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type DailyClaimResult = CreditSummary & {
+  claimed: boolean;
+  grantAmount: number;
+  reason?: 'already_claimed' | 'balance_cap_reached';
+};
+
 export function calculateGenerationCreditCost(variationCount: number | undefined): number {
   const safeVariations = Math.max(1, Math.min(4, Number.isFinite(variationCount) ? Math.floor(Number(variationCount)) : 1));
   return safeVariations * CREDIT_AMOUNTS.generationVariation;
@@ -62,6 +79,37 @@ export function getCreditSummary(userId: string): CreditSummary {
     lastDailyClaimAt: row.last_daily_credit_claim_at,
     streakDays: row.credit_streak_days ?? 0,
   };
+}
+
+export function getCreditLedger(userId: string, limit = 50): CreditLedgerEntry[] {
+  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+  const rows = db.prepare(
+    `SELECT id, delta, balance_after, reason, reference_type, reference_id, metadata, created_at
+     FROM credit_ledger
+     WHERE user_id = ?
+     ORDER BY created_at DESC
+     LIMIT ?`
+  ).all(userId, safeLimit) as Array<{
+    id: string;
+    delta: number;
+    balance_after: number;
+    reason: CreditReason;
+    reference_type: string | null;
+    reference_id: string | null;
+    metadata: string | null;
+    created_at: string;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    delta: row.delta,
+    balanceAfter: row.balance_after,
+    reason: row.reason,
+    referenceType: row.reference_type,
+    referenceId: row.reference_id,
+    metadata: row.metadata ? JSON.parse(row.metadata) as Record<string, unknown> : null,
+    createdAt: row.created_at,
+  }));
 }
 
 export function recordCreditLedgerEntry(params: {
@@ -142,5 +190,62 @@ export function refundCredits(params: {
     });
 
     return { ...summary, balance: nextBalance };
+  });
+}
+
+function dateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function daysBetween(first: string, second: string): number {
+  const firstDate = new Date(`${first}T00:00:00.000Z`);
+  const secondDate = new Date(`${second}T00:00:00.000Z`);
+  return Math.round((secondDate.getTime() - firstDate.getTime()) / 86_400_000);
+}
+
+export function claimDailyCredits(userId: string, now = new Date()): DailyClaimResult {
+  return transaction(() => {
+    const summary = getCreditSummary(userId);
+    const today = dateKey(now);
+    const lastClaimDate = summary.lastDailyClaimAt ? dateKey(new Date(summary.lastDailyClaimAt)) : null;
+
+    if (lastClaimDate === today) {
+      return { ...summary, claimed: false, grantAmount: 0, reason: 'already_claimed' };
+    }
+
+    if (summary.balance >= CREDIT_AMOUNTS.freeBalanceCap) {
+      return { ...summary, claimed: false, grantAmount: 0, reason: 'balance_cap_reached' };
+    }
+
+    const nextStreakDays = lastClaimDate && daysBetween(lastClaimDate, today) === 1
+      ? summary.streakDays + 1
+      : 1;
+    const streakBonus = Math.min((nextStreakDays - 1) * CREDIT_AMOUNTS.streakBonusStep, CREDIT_AMOUNTS.streakBonusMax);
+    const uncappedGrant = CREDIT_AMOUNTS.dailyClaim + streakBonus;
+    const grantAmount = Math.min(uncappedGrant, CREDIT_AMOUNTS.freeBalanceCap - summary.balance);
+    const nextBalance = summary.balance + grantAmount;
+    const claimedAt = now.toISOString();
+
+    db.prepare(
+      `UPDATE users
+       SET credit_balance = ?, last_daily_credit_claim_at = ?, credit_streak_days = ?, updated_at = datetime('now')
+       WHERE id = ?`
+    ).run(nextBalance, claimedAt, nextStreakDays, userId);
+
+    recordCreditLedgerEntry({
+      userId,
+      delta: grantAmount,
+      balanceAfter: nextBalance,
+      reason: 'daily_claim',
+      metadata: { streakDays: nextStreakDays, streakBonus },
+    });
+
+    return {
+      balance: nextBalance,
+      lastDailyClaimAt: claimedAt,
+      streakDays: nextStreakDays,
+      claimed: true,
+      grantAmount,
+    };
   });
 }
