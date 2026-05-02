@@ -12,7 +12,7 @@ const I18nContext = createContext<I18nContextType | undefined>(undefined);
 export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>(() => {
     const stored = localStorage.getItem('language') as Language;
-    return stored === 'zh' || stored === 'en' || stored === 'ja' || stored === 'ko' ? stored : 'en';
+    return stored === 'zh' || stored === 'en' || stored === 'ja' || stored === 'ko' || stored === 'sk' ? stored : 'sk';
   });
 
   const handleSetLanguage = (lang: Language) => {
@@ -21,7 +21,7 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const t = (key: TranslationKey): string => {
-    return translations[language][key] || key;
+    return translations[language]?.[key] ?? translations.en[key] ?? key;
   };
 
   return (
@@ -29,6 +29,17 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       {children}
     </I18nContext.Provider>
   );
+};
+
+export const localeForLanguage = (language: Language): string => {
+  switch (language) {
+    case 'zh':
+      return 'zh-CN';
+    case 'sk':
+      return 'sk-SK';
+    default:
+      return 'en-US';
+  }
 };
 
 export const useI18n = () => {

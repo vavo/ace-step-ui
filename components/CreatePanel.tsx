@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { generateApi } from '../services/api';
 import { MAIN_STYLES } from '../data/genres';
+import { VOCAL_LANGUAGE_KEYS } from '../data/vocalLanguages';
 import { EditableSlider } from './EditableSlider';
 
 interface ReferenceTrack {
@@ -55,59 +56,6 @@ const TRACK_NAMES = [
   'keyboard', 'guitar', 'bass', 'drums', 'backing_vocals', 'vocals',
 ];
 
-const VOCAL_LANGUAGE_KEYS = [
-  { value: 'unknown', key: 'autoInstrumental' as const },
-  { value: 'ar', key: 'vocalArabic' as const },
-  { value: 'az', key: 'vocalAzerbaijani' as const },
-  { value: 'bg', key: 'vocalBulgarian' as const },
-  { value: 'bn', key: 'vocalBengali' as const },
-  { value: 'ca', key: 'vocalCatalan' as const },
-  { value: 'cs', key: 'vocalCzech' as const },
-  { value: 'da', key: 'vocalDanish' as const },
-  { value: 'de', key: 'vocalGerman' as const },
-  { value: 'el', key: 'vocalGreek' as const },
-  { value: 'en', key: 'vocalEnglish' as const },
-  { value: 'es', key: 'vocalSpanish' as const },
-  { value: 'fa', key: 'vocalPersian' as const },
-  { value: 'fi', key: 'vocalFinnish' as const },
-  { value: 'fr', key: 'vocalFrench' as const },
-  { value: 'he', key: 'vocalHebrew' as const },
-  { value: 'hi', key: 'vocalHindi' as const },
-  { value: 'hr', key: 'vocalCroatian' as const },
-  { value: 'ht', key: 'vocalHaitianCreole' as const },
-  { value: 'hu', key: 'vocalHungarian' as const },
-  { value: 'id', key: 'vocalIndonesian' as const },
-  { value: 'is', key: 'vocalIcelandic' as const },
-  { value: 'it', key: 'vocalItalian' as const },
-  { value: 'ja', key: 'vocalJapanese' as const },
-  { value: 'ko', key: 'vocalKorean' as const },
-  { value: 'la', key: 'vocalLatin' as const },
-  { value: 'lt', key: 'vocalLithuanian' as const },
-  { value: 'ms', key: 'vocalMalay' as const },
-  { value: 'ne', key: 'vocalNepali' as const },
-  { value: 'nl', key: 'vocalDutch' as const },
-  { value: 'no', key: 'vocalNorwegian' as const },
-  { value: 'pa', key: 'vocalPunjabi' as const },
-  { value: 'pl', key: 'vocalPolish' as const },
-  { value: 'pt', key: 'vocalPortuguese' as const },
-  { value: 'ro', key: 'vocalRomanian' as const },
-  { value: 'ru', key: 'vocalRussian' as const },
-  { value: 'sa', key: 'vocalSanskrit' as const },
-  { value: 'sk', key: 'vocalSlovak' as const },
-  { value: 'sr', key: 'vocalSerbian' as const },
-  { value: 'sv', key: 'vocalSwedish' as const },
-  { value: 'sw', key: 'vocalSwahili' as const },
-  { value: 'ta', key: 'vocalTamil' as const },
-  { value: 'te', key: 'vocalTelugu' as const },
-  { value: 'th', key: 'vocalThai' as const },
-  { value: 'tl', key: 'vocalTagalog' as const },
-  { value: 'tr', key: 'vocalTurkish' as const },
-  { value: 'uk', key: 'vocalUkrainian' as const },
-  { value: 'ur', key: 'vocalUrdu' as const },
-  { value: 'vi', key: 'vocalVietnamese' as const },
-  { value: 'yue', key: 'vocalCantonese' as const },
-  { value: 'zh', key: 'vocalChineseMandarin' as const },
-];
 
 export const CreatePanel: React.FC<CreatePanelProps> = ({
   onGenerate,
@@ -496,6 +444,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       setInstrumental(initialData.song.lyrics.length === 0);
     }
   }, [initialData]);
+
+  useEffect(() => {
+    if (!user?.default_vocal_language) return;
+    setVocalLanguage(user.default_vocal_language);
+  }, [user?.default_vocal_language]);
 
   useEffect(() => {
     if (!pendingAudioSelection) return;

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
   bio TEXT,
   avatar_url TEXT,
   banner_url TEXT,
+  default_vocal_language TEXT DEFAULT 'en',
+  default_ui_language TEXT DEFAULT 'sk',
   is_admin INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
@@ -141,12 +143,30 @@ CREATE INDEX IF NOT EXISTS idx_reference_tracks_user_id ON reference_tracks(user
 CREATE INDEX IF NOT EXISTS idx_reference_tracks_created_at ON reference_tracks(created_at);
 `;
 
+function ensureUserSettingColumns(): void {
+  const tableInfo = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
+  const existingColumns = new Set(tableInfo.map((col) => col.name));
+
+  if (!existingColumns.has('default_vocal_language')) {
+    db.exec("ALTER TABLE users ADD COLUMN default_vocal_language TEXT DEFAULT 'en'");
+  }
+
+  if (!existingColumns.has('default_ui_language')) {
+    db.exec("ALTER TABLE users ADD COLUMN default_ui_language TEXT DEFAULT 'sk'");
+  }
+
+  db.exec(
+    "UPDATE users SET default_ui_language = 'sk' WHERE default_ui_language IS NULL OR TRIM(default_ui_language) = ''"
+  );
+}
+
 function migrate(): void {
   console.log('Running SQLite database migrations...');
 
   try {
     // Execute the entire migration script at once
     db.exec(migrations);
+    ensureUserSettingColumns();
     console.log('Migrations completed successfully!');
   } catch (error) {
     // Check if it's just "already exists" errors
@@ -157,6 +177,8 @@ function migrate(): void {
       console.error('Migration failed:', error);
       throw error;
     }
+
+    ensureUserSettingColumns();
   }
 }
 

@@ -17,12 +17,28 @@ function issueAccessToken(payload: { id: string; username: string }): string {
   return jwt.sign(payload, config.jwt.secret, jwtOptions);
 }
 
+const userSelectFields = 'id, username, bio, avatar_url, banner_url, is_admin, default_vocal_language, default_ui_language, created_at';
+
+function buildUserPayload(user: { [key: string]: unknown }) {
+  return {
+    id: user.id,
+    username: user.username,
+    bio: user.bio,
+    avatar_url: user.avatar_url,
+    banner_url: user.banner_url,
+    isAdmin: Boolean(user.is_admin),
+    createdAt: user.created_at,
+    default_vocal_language: user.default_vocal_language || 'en',
+    default_ui_language: user.default_ui_language || 'sk',
+  };
+}
+
 // Auto-login: Get the default user from database (for local single-user app)
 router.get('/auto', async (_req: Request, res: Response) => {
   try {
     // Get the first user from the database (local app typically has one user)
     const result = await pool.query(
-      'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users ORDER BY created_at ASC LIMIT 1'
+      `SELECT ${userSelectFields} FROM users ORDER BY created_at ASC LIMIT 1`
     );
 
     if (result.rows.length === 0) {
@@ -39,18 +55,7 @@ router.get('/auto', async (_req: Request, res: Response) => {
       username: user.username,
     });
 
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        bio: user.bio,
-        avatar_url: user.avatar_url,
-        banner_url: user.banner_url,
-        isAdmin: Boolean(user.is_admin),
-        createdAt: user.created_at,
-      },
-      token,
-    });
+    res.json({ user: buildUserPayload(user), token });
   } catch (error) {
     console.error('Auto-login error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -80,7 +85,7 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
 
     // Check if user exists
     const existingUser = await pool.query(
-      'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE username = ?',
+      `SELECT ${userSelectFields} FROM users WHERE username = ?`,
       [sanitizedUsername]
     );
 
@@ -99,7 +104,7 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
       );
 
       const newUser = await pool.query(
-        'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE id = ?',
+        `SELECT ${userSelectFields} FROM users WHERE id = ?`,
         [userId]
       );
       user = newUser.rows[0];
@@ -112,15 +117,7 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
     });
 
     res.status(200).json({
-      user: {
-        id: user.id,
-        username: user.username,
-        bio: user.bio,
-        avatar_url: user.avatar_url,
-        banner_url: user.banner_url,
-        isAdmin: Boolean(user.is_admin),
-        createdAt: user.created_at,
-      },
+      user: buildUserPayload(user),
       token,
     });
   } catch (error) {
@@ -133,7 +130,7 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
 router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = await pool.query(
-      'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE id = ?',
+      `SELECT ${userSelectFields} FROM users WHERE id = ?`,
       [req.user!.id]
     );
 
@@ -143,17 +140,7 @@ router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respons
     }
 
     const user = result.rows[0];
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        bio: user.bio,
-        avatar_url: user.avatar_url,
-        banner_url: user.banner_url,
-        isAdmin: Boolean(user.is_admin),
-        createdAt: user.created_at,
-      },
-    });
+    res.json({ user: buildUserPayload(user) });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -200,7 +187,7 @@ router.patch('/username', authMiddleware, async (req: AuthenticatedRequest, res:
 
     // Get updated user
     const result = await pool.query(
-      'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE id = ?',
+      `SELECT ${userSelectFields} FROM users WHERE id = ?`,
       [req.user!.id]
     );
 
@@ -212,18 +199,7 @@ router.patch('/username', authMiddleware, async (req: AuthenticatedRequest, res:
       username: user.username,
     });
 
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        bio: user.bio,
-        avatar_url: user.avatar_url,
-        banner_url: user.banner_url,
-        isAdmin: Boolean(user.is_admin),
-        createdAt: user.created_at,
-      },
-      token,
-    });
+    res.json({ user: buildUserPayload(user), token });
   } catch (error) {
     console.error('Update username error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -239,7 +215,7 @@ router.post('/logout', async (_req: Request, res: Response) => {
 router.post('/refresh', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = await pool.query(
-      'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE id = ?',
+      `SELECT ${userSelectFields} FROM users WHERE id = ?`,
       [req.user!.id]
     );
 
@@ -254,18 +230,7 @@ router.post('/refresh', authMiddleware, async (req: AuthenticatedRequest, res: R
       username: user.username,
     });
 
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        bio: user.bio,
-        avatar_url: user.avatar_url,
-        banner_url: user.banner_url,
-        isAdmin: Boolean(user.is_admin),
-        createdAt: user.created_at,
-      },
-      token,
-    });
+    res.json({ user: buildUserPayload(user), token });
   } catch (error) {
     console.error('Refresh token error:', error);
     res.status(500).json({ error: 'Internal server error' });

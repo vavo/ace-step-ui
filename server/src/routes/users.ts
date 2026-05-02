@@ -6,6 +6,21 @@ import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '..
 import { getStorageProvider } from '../services/storage/factory.js';
 
 const router = Router();
+const userSelectFields = 'id, username, created_at, bio, avatar_url, banner_url, default_vocal_language, default_ui_language';
+
+function getValidUiLanguage(language: unknown): string {
+  if (typeof language !== 'string') return 'sk';
+  const normalized = language.toLowerCase();
+  return ['en', 'zh', 'ja', 'ko', 'sk'].includes(normalized) ? normalized : 'sk';
+}
+
+function getValidVocalLanguage(language: unknown): string | null {
+  if (typeof language !== 'string') return null;
+  const value = language.trim().toLowerCase();
+  if (!value) return null;
+  if (value === 'unknown') return 'unknown';
+  return /^[a-z]{2,5}(?:-[a-z]{2})?$/.test(value) ? value : null;
+}
 
 async function resolvePublicAudioUrl(audioUrl: string | null): Promise<string | null> {
     if (!audioUrl) return null;
@@ -68,7 +83,7 @@ router.get('/public/featured', async (_req, res: Response) => {
 router.get('/:username', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const result = await pool.query(
-            `SELECT u.id, u.username, u.created_at, u.bio, u.avatar_url, u.banner_url
+            `SELECT ${userSelectFields}
              FROM users u
              WHERE u.username = $1`,
             [req.params.username]
@@ -179,7 +194,7 @@ router.post('/me/avatar', authMiddleware, upload.single('avatar'), async (req: A
 
         // Update user record
         const result = await pool.query(
-            `UPDATE users SET avatar_url = $1, updated_at = datetime('now') WHERE id = $2 RETURNING id, username, created_at, bio, avatar_url, banner_url`,
+            `UPDATE users SET avatar_url = $1, updated_at = datetime('now') WHERE id = $2 RETURNING ${userSelectFields}`,
             [url, userId]
         );
 
@@ -209,7 +224,7 @@ router.post('/me/banner', authMiddleware, upload.single('banner'), async (req: A
 
         // Update user record
         const result = await pool.query(
-            `UPDATE users SET banner_url = $1, updated_at = datetime('now') WHERE id = $2 RETURNING id, username, created_at, bio, avatar_url, banner_url`,
+            `UPDATE users SET banner_url = $1, updated_at = datetime('now') WHERE id = $2 RETURNING ${userSelectFields}`,
             [url, userId]
         );
 
@@ -223,7 +238,25 @@ router.post('/me/banner', authMiddleware, upload.single('banner'), async (req: A
 // Update own profile
 router.patch('/me', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const { username, bio, avatarUrl, bannerUrl } = req.body;
+        const {
+            username,
+            bio,
+            avatarUrl,
+            bannerUrl,
+            defaultVocalLanguage,
+            defaultUiLanguage,
+            default_vocal_language,
+            default_ui_language,
+        } = req.body as {
+            username?: string;
+            bio?: string;
+            avatarUrl?: string;
+            bannerUrl?: string;
+            defaultVocalLanguage?: string;
+            defaultUiLanguage?: string;
+            default_vocal_language?: string;
+            default_ui_language?: string;
+        };
 
         const updates: string[] = [];
         const values: unknown[] = [];
@@ -262,6 +295,21 @@ router.patch('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respo
             paramCount++;
         }
 
+        const resolvedDefaultVocalLanguage = getValidVocalLanguage(defaultVocalLanguage) ?? getValidVocalLanguage(default_vocal_language);
+        if (resolvedDefaultVocalLanguage !== null) {
+            updates.push(`default_vocal_language = $${paramCount}`);
+            values.push(resolvedDefaultVocalLanguage);
+            paramCount++;
+        }
+
+        const resolvedDefaultUiLanguage = getValidUiLanguage(defaultUiLanguage ?? default_ui_language);
+        const hasUiLanguageInput = req.body.defaultUiLanguage !== undefined || req.body.default_ui_language !== undefined;
+        if (resolvedDefaultUiLanguage && hasUiLanguageInput) {
+            updates.push(`default_ui_language = $${paramCount}`);
+            values.push(resolvedDefaultUiLanguage);
+            paramCount++;
+        }
+
         if (updates.length === 0) {
             res.status(400).json({ error: 'No fields to update' });
             return;
@@ -271,7 +319,7 @@ router.patch('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respo
         values.push(req.user!.id);
 
         const result = await pool.query(
-            `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING id, username, created_at, bio, avatar_url, banner_url`,
+            `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING ${userSelectFields}`,
             values
         );
 

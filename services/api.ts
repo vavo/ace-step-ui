@@ -57,6 +57,19 @@ export interface User {
   avatar_url?: string;
   banner_url?: string;
   createdAt?: string;
+  default_vocal_language?: string;
+  default_ui_language?: string;
+}
+
+export interface UserProfileUpdate {
+  username?: string;
+  bio?: string;
+  avatarUrl?: string;
+  bannerUrl?: string;
+  defaultVocalLanguage?: string;
+  defaultUiLanguage?: string;
+  default_vocal_language?: string;
+  default_ui_language?: string;
 }
 
 export interface AuthResponse {
@@ -441,7 +454,7 @@ export const usersApi = {
   getFeaturedCreators: (): Promise<{ creators: Array<UserProfile & { follower_count?: number }> }> =>
     api('/api/users/public/featured'),
 
-  updateProfile: (updates: Partial<User>, token: string): Promise<{ user: User }> =>
+  updateProfile: (updates: UserProfileUpdate, token: string): Promise<{ user: User }> =>
     api('/api/users/me', { method: 'PATCH', body: updates, token }),
 
   uploadAvatar: async (file: File, token: string): Promise<{ user: UserProfile; url: string }> => {

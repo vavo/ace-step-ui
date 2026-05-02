@@ -139,6 +139,8 @@ export interface User {
   isAdmin?: boolean;
   avatar_url?: string;
   banner_url?: string;
+  default_vocal_language?: string;
+  default_ui_language?: string;
 }
 
 export interface UserProfile {

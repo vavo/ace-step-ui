@@ -3,7 +3,7 @@ import { Song, Playlist } from '../types';
 import { usersApi, getAudioUrl, UserProfile as UserProfileType, songsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Play, Pause, Heart, Eye, Users, Music as MusicIcon, ChevronRight, Share2, MoreHorizontal, Edit3, X, Camera, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
-import { useI18n } from '../context/I18nContext';
+import { localeForLanguage, useI18n } from '../context/I18nContext';
 
 interface UserProfileProps {
     username: string;
@@ -358,7 +358,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
 
                                     {profileUser.supporter_since && profileUser.accountTier && profileUser.accountTier !== 'free' && (
                                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-                                            {t('supportingSince')} {new Date(profileUser.supporter_since).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', year: 'numeric' })}
+                                    {t('supportingSince')} {new Date(profileUser.supporter_since).toLocaleDateString(localeForLanguage(language), { month: 'long', year: 'numeric' })}
                                         </p>
                                     )}
 
@@ -370,7 +370,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                                     )}
 
                                     <p className="text-zinc-500 text-xs md:text-sm mb-4">
-                                        {t('joined')} {new Date(profileUser.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', year: 'numeric' })}
+                                        {t('joined')} {new Date(profileUser.created_at).toLocaleDateString(localeForLanguage(language), { month: 'long', year: 'numeric' })}
                                     </p>
                                 </div>
 

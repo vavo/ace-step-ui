@@ -16,6 +16,7 @@ import { generateApi, songsApi, playlistsApi, getAudioUrl } from './services/api
 import { useAuth } from './context/AuthContext';
 import { useResponsive } from './context/ResponsiveContext';
 import { I18nProvider, useI18n } from './context/I18nContext';
+import { Language } from './i18n/translations';
 import { List } from 'lucide-react';
 import { PlaylistDetail } from './components/PlaylistDetail';
 import { Toast, ToastType } from './components/Toast';
@@ -26,13 +27,14 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 
 function AppContent() {
   // i18n
-  const { t } = useI18n();
+  const { t, language, setLanguage } = useI18n();
 
   // Responsive
   const { isMobile, isDesktop } = useResponsive();
 
   // Auth
   const { user, token, isAuthenticated, isLoading: authLoading, setupUser, logout } = useAuth();
+  
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   // Track multiple concurrent generation jobs
   const activeJobsRef = useRef<Map<string, { tempId: string; pollInterval: ReturnType<typeof setInterval> }>>(new Map());
@@ -154,6 +156,14 @@ function AppContent() {
       setShowUsernameModal(true);
     }
   }, [authLoading, isAuthenticated]);
+
+  useEffect(() => {
+    if (!user?.default_ui_language) return;
+    const nextLanguage = user.default_ui_language as Language;
+    if (nextLanguage !== language) {
+      setLanguage(nextLanguage);
+    }
+  }, [user?.default_ui_language, setLanguage, language]);
 
   // Load Playlists
   useEffect(() => {

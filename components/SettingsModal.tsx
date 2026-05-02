@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Globe, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useI18n } from '../context/I18nContext';
+import { localeForLanguage, useI18n } from '../context/I18nContext';
+import { Language } from '../i18n/translations';
 import { EditProfileModal } from './EditProfileModal';
+import { usersApi } from '../services/api';
+import { VOCAL_LANGUAGE_KEYS } from '../data/vocalLanguages';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -13,11 +16,74 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onToggleTheme, onNavigateToProfile }) => {
-    const { user } = useAuth();
+    const { user, token, refreshUser } = useAuth();
     const { t, language, setLanguage } = useI18n();
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [showLangInfo, setShowLangInfo] = useState(false);
+    const [defaultVocalLanguage, setDefaultVocalLanguage] = useState(user?.default_vocal_language || 'en');
+    const [defaultUiLanguage, setDefaultUiLanguage] = useState<Language>(user?.default_ui_language as Language || language);
     const langInfoRef = useRef<HTMLDivElement>(null);
+    const defaultsPersistenceRef = useRef({
+        vocalLanguage: user?.default_vocal_language || 'en',
+        uiLanguage: (user?.default_ui_language as Language | undefined) || language,
+    });
+
+    const supportedLanguages: Language[] = ['en', 'zh', 'ja', 'ko', 'sk'];
+    const resolveUiLanguage = (value: unknown): Language => {
+        return typeof value === 'string' && supportedLanguages.includes(value as Language)
+            ? (value as Language)
+            : 'sk';
+    };
+
+    useEffect(() => {
+        if (!user) return;
+        const userVocalLanguage = user.default_vocal_language || 'en';
+        const userUiLanguage = resolveUiLanguage(user.default_ui_language);
+        setDefaultVocalLanguage(userVocalLanguage);
+        setDefaultUiLanguage(userUiLanguage);
+        defaultsPersistenceRef.current = {
+            vocalLanguage: userVocalLanguage,
+            uiLanguage: userUiLanguage,
+        };
+    }, [user]);
+
+    const persistLanguageDefaults = async () => {
+        if (!user || !token) return;
+        const normalizedUiLanguage = resolveUiLanguage(defaultUiLanguage);
+
+        if (
+            defaultsPersistenceRef.current.vocalLanguage === defaultVocalLanguage &&
+            defaultsPersistenceRef.current.uiLanguage === normalizedUiLanguage
+        ) {
+            return;
+        }
+
+        try {
+            await usersApi.updateProfile(
+                {
+                    defaultVocalLanguage: defaultVocalLanguage,
+                    defaultUiLanguage: normalizedUiLanguage,
+                },
+                token
+            );
+            defaultsPersistenceRef.current = {
+                vocalLanguage: defaultVocalLanguage,
+                uiLanguage: normalizedUiLanguage,
+            };
+            setLanguage(normalizedUiLanguage);
+            await refreshUser();
+        } catch (error) {
+            console.error('Failed to update default settings:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (!user) return;
+        const timer = window.setTimeout(() => {
+            persistLanguageDefaults();
+        }, 250);
+        return () => window.clearTimeout(timer);
+    }, [defaultUiLanguage, defaultVocalLanguage, user?.id, token]);
 
     useEffect(() => {
         if (!showLangInfo) return;
@@ -74,7 +140,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                             <div className="flex-1">
                                 <h3 className="text-xl font-bold text-zinc-900 dark:text-white">@{user.username}</h3>
                                 <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
-                                    {t('memberSince')} {new Date(user.createdAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', year: 'numeric' })}
+                                    {t('memberSince')} {new Date(user.createdAt).toLocaleDateString(localeForLanguage(defaultUiLanguage), { month: 'long', year: 'numeric' })}
                                 </p>
                             </div>
                             <div className="flex gap-2">
@@ -162,20 +228,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                         <div className="pl-7 space-y-3">
                             <div className="relative">
                                 <select
-                                    value={language}
-                                    onChange={(e) => setLanguage(e.target.value as 'en' | 'zh' | 'ja' | 'ko')}
+                                    value={defaultUiLanguage}
+                                    onChange={(e) => setDefaultUiLanguage(e.target.value as Language)}
                                     className="w-full appearance-none py-3 px-4 pr-10 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium transition-colors hover:border-zinc-400 dark:hover:border-zinc-600 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 cursor-pointer"
                                 >
                                     <option value="en">{t('english')}</option>
                                     <option value="zh">{t('chinese')}</option>
                                     <option value="ja">{t('japaneseLanguage')}</option>
                                     <option value="ko">{t('koreanLanguage')}</option>
+                                    <option value="sk">{t('slovak')}</option>
                                 </select>
                                 <ChevronDown
                                     size={20}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
                                 />
                             </div>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('defaultUiLanguage')}</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <label className="text-sm text-zinc-500 dark:text-zinc-400">{t('defaultVocalLanguage')}</label>
+                        <div className="relative">
+                            <select
+                                value={defaultVocalLanguage}
+                                onChange={(e) => setDefaultVocalLanguage(e.target.value)}
+                                className="w-full appearance-none py-3 px-4 pr-10 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium transition-colors hover:border-zinc-400 dark:hover:border-zinc-600 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 cursor-pointer"
+                            >
+                                {VOCAL_LANGUAGE_KEYS.map((languageOption) => (
+                                    <option key={languageOption.value} value={languageOption.value}>
+                                        {t(languageOption.key)}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown
+                                size={20}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+                            />
                         </div>
                     </div>
 
