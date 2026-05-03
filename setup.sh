@@ -46,9 +46,27 @@ ACESTEP_PATH=$ACESTEP_PATH
 # Server ports
 PORT=3001
 FRONTEND_PORT=3000
+FRONTEND_URL=http://localhost:3000
+VITE_API_URL=http://localhost:3001
+PUBLIC_API_URL=http://localhost:3001
 
 # Database
-DATABASE_PATH=./server/data/acestep.db
+DATABASE_PATH=./data/acestep.db
+
+# Auth and product defaults
+JWT_SECRET=ace-step-ui-local-secret
+AUTH_SESSION_DAYS=30
+PRODUCT_TIME_ZONE=Europe/Bratislava
+
+# Optional Google OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_OAUTH_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
+
+# Optional OpenAI lyrics and AI format actions
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+FORMAT_PROVIDER=auto
 EOF
 
 # Install frontend dependencies
@@ -67,7 +85,7 @@ cd ..
 echo ""
 echo "Initializing database..."
 cd server
-npm run migrate 2>/dev/null || echo "Migration script not found, skipping..."
+npm run db:migrate 2>/dev/null || echo "Database migration failed or was already applied, continuing..."
 cd ..
 
 echo ""

@@ -151,6 +151,8 @@
 | **FFmpeg** | For audio processing |
 | **uv** | Python package manager (recommended for standard install) |
 
+Python helper scripts in this repository run inside the ACE-Step Python environment. See `requirements.txt`; this app does not maintain a separate Python dependency stack.
+
 ---
 
 ## ⚡ Quick Start
@@ -235,6 +237,55 @@ Open **http://localhost:3000** and start creating!
 
 ---
 
+## Runtime / Redeploy
+
+Do not open `index.html` directly with `file://`. The built app expects the server to provide `/api`, auth cookies, OAuth callbacks, audio files, and server-side config. Use a real local URL.
+
+### Production-like local redeploy
+
+```bash
+cd /Users/vavo/DEV/acestep/ace-step-ui
+git pull origin main
+
+npm install
+npm --prefix server install
+
+npm --prefix server run build
+npm run build
+
+NODE_ENV=production PORT=3001 npm --prefix server start
+```
+
+Open `http://localhost:3001`.
+
+If the app is managed by a process manager, run the install/build steps, then restart that managed server process instead of starting a second one.
+
+### Required production env
+
+For a local production-like run:
+
+```env
+NODE_ENV=production
+PORT=3001
+FRONTEND_URL=http://localhost:3001
+PUBLIC_API_URL=http://localhost:3001
+GOOGLE_OAUTH_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4o-mini
+FORMAT_PROVIDER=openai
+JWT_SECRET=replace_with_a_long_random_secret
+```
+
+For a real deployment, replace every localhost URL with the public HTTPS origin and register the same callback URL in Google Cloud Console.
+
+In `NODE_ENV=production`, nickname login is disabled. Use Google OAuth. For local nickname login, run with `NODE_ENV=development`.
+
+More detail: `docs/runtime.md`.
+
+---
+
 ## 📦 Installation
 
 ### 1. Install ACE-Step (The AI Engine)
@@ -301,11 +352,11 @@ cd server
 npm install
 cd ..
 
-# Copy environment file
+# Copy environment file used by the app runtime
 # Linux/macOS:
-cp server/.env.example server/.env
+cp .env.example .env
 # Windows:
-copy server\.env.example server\.env
+copy .env.example .env
 ```
 
 ---
@@ -359,7 +410,7 @@ start.bat
 
 ## ⚙️ Configuration
 
-Edit `server/.env`:
+Edit the repository root `.env`:
 
 ```env
 # Server
@@ -374,6 +425,8 @@ DATABASE_PATH=./data/acestep.db
 # Optional: Pexels API for video backgrounds
 PEXELS_API_KEY=your_key_here
 ```
+
+`server/.env.example` remains as a compatibility reference for older local workflows, but the current app runtime loads the root `.env`.
 
 ---
 
