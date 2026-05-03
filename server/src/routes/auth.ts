@@ -129,7 +129,7 @@ async function upsertGoogleUser(profile: GoogleProfile) {
 router.get('/auto', async (_req: Request, res: Response) => {
   try {
     if (!isLocalAuthAllowed()) {
-      res.status(404).json({ error: 'Local auto-login is disabled' });
+      res.json({ authenticated: false, user: null, token: null });
       return;
     }
 

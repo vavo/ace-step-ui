@@ -1072,7 +1072,22 @@ router.get('/models', async (_req, res: Response) => {
     res.json({ models });
   } catch (error) {
     console.error('Models error:', error);
-    res.status(500).json({ error: (error as Error).message });
+    res.json({
+      models: [
+        'acestep-v15-turbo',
+        'acestep-v15-base',
+        'acestep-v15-sft',
+        'acestep-v15-turbo-shift1',
+        'acestep-v15-turbo-shift3',
+        'acestep-v15-turbo-continuous',
+      ].map((name) => ({
+        name,
+        is_active: name === 'acestep-v15-turbo-shift3',
+        is_preloaded: false,
+      })),
+      fallback: true,
+      error: error instanceof Error ? error.message : 'Failed to load models',
+    });
   }
 });
 

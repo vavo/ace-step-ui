@@ -114,9 +114,6 @@ export const authApi = {
   options: (): Promise<AuthOptions> =>
     api('/api/auth/options'),
 
-  auto: (): Promise<AuthResponse> =>
-    api('/api/auth/auto'),
-
   setup: (username: string): Promise<AuthResponse> =>
     api('/api/auth/setup', { method: 'POST', body: { username } }),
 
