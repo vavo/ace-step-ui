@@ -145,9 +145,9 @@
 | Requirement | Specification |
 |-------------|---------------|
 | **Node.js** | 18 or higher |
-| **Python** | 3.10+ (3.11 recommended) OR Windows Portable Package |
+| **Python** | 3.10+ (3.11 recommended) |
 | **NVIDIA GPU** | 4GB+ VRAM (works without LLM), 12GB+ recommended (with LLM) |
-| **CUDA** | 12.8 (for Windows Portable Package) |
+| **CUDA** | Compatible with your ACE-Step/PyTorch install |
 | **FFmpeg** | For audio processing |
 | **uv** | Python package manager (recommended for standard install) |
 
@@ -159,7 +159,7 @@ Python helper scripts in this repository run inside the ACE-Step Python environm
 
 ### 🎯 Pinokio - 1-Click Install (Recommended for All Users!)
 
-The easiest way to get ACE-Step UI up and running on **any platform** — no terminal, no manual setup:
+The easiest way to get ACE-Step UI up and running without manual terminal setup:
 
 <p align="center">
   <a href="https://beta.pinokio.co/apps/github-com-cocktailpeanut-ace-step-ui-pinokio">
@@ -170,31 +170,6 @@ The easiest way to get ACE-Step UI up and running on **any platform** — no ter
 > **[Pinokio](https://pinokio.computer)** handles everything automatically: Python, Node.js, dependencies, model downloads, and launching. Just click install and start making music.
 
 ---
-
-### 🪟 Windows - One-Click Start (Easiest!)
-```batch
-cd ace-step-ui
-start-all.bat
-```
-**That's it!** This starts everything: API + Backend + Frontend in one command.
-
-> **Note:** By default, it looks for ACE-Step in `..\ACE-Step-1.5`.
-> If yours is elsewhere, set `ACESTEP_PATH` first:
-> ```batch
-> set ACESTEP_PATH=C:\path\to\ACE-Step-1.5
-> start-all.bat
-> ```
-
-### 🪟 Windows - Manual Start
-```batch
-REM 1. Start ACE-Step Gradio (with API endpoints)
-cd C:\ACE-Step-1.5
-python_embeded\python -m acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
-
-REM 2. Start ACE-Step UI (in another terminal)
-cd ace-step-ui
-start.bat
-```
 
 ### Linux / macOS - One-Click Start (Easiest!)
 ```bash
@@ -220,17 +195,6 @@ uv run acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
 # 2. Start ACE-Step UI (in another terminal)
 cd ace-step-ui
 ./start.sh
-```
-
-### Windows (Standard Installation)
-```batch
-REM 1. Start ACE-Step Gradio with API (in ACE-Step-1.5 directory)
-cd C:\path\to\ACE-Step-1.5
-uv run acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
-
-REM 2. Start ACE-Step UI (in another terminal)
-cd ace-step-ui
-start.bat
 ```
 
 Open **http://localhost:3000** and start creating!
@@ -290,21 +254,7 @@ More detail: `docs/runtime.md`.
 
 ### 1. Install ACE-Step (The AI Engine)
 
-#### 🪟 Windows Portable Package (Recommended for Windows)
-
-**The easiest way to get started on Windows!** This package includes everything pre-configured:
-
-1. **Download** [ACE-Step-1.5.7z](https://files.acemusic.ai/acemusic/win/ACE-Step-1.5.7z) (~5GB)
-2. **Extract** to `C:\ACE-Step-1.5` (or your preferred location)
-3. **Done!** The package includes `python_embeded` with all dependencies
-
-✅ **Works with 4GB GPU** - No LLM installation required
-✅ **CUDA 12.8** included
-✅ **Zero setup hassle**
-
-> **Note:** Thinking Mode (LLM features) is automatically disabled on GPUs with <12GB VRAM. You can still enable it manually if you have 12GB+.
-
-#### Standard Installation (All Platforms)
+#### Standard Installation
 
 ```bash
 # Clone ACE-Step 1.5 - the open source Suno alternative
@@ -331,17 +281,7 @@ cd ace-step-ui
 ./setup.sh
 ```
 
-#### Windows
-```batch
-REM Clone the UI
-git clone https://github.com/fspecii/ace-step-ui
-cd ace-step-ui
-
-REM Run setup script (installs all dependencies)
-setup.bat
-```
-
-#### Manual Installation (All Platforms)
+#### Manual Installation
 
 ```bash
 # Install frontend dependencies
@@ -353,10 +293,7 @@ npm install
 cd ..
 
 # Copy environment file used by the app runtime
-# Linux/macOS:
 cp .env.example .env
-# Windows:
-copy .env.example .env
 ```
 
 ---
@@ -365,21 +302,9 @@ copy .env.example .env
 
 ### Step 1: Start ACE-Step Gradio Server
 
-**🪟 Windows Portable Package:**
-```batch
-cd C:\ACE-Step-1.5
-python_embeded\python -m acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
-```
-
 **Linux / macOS:**
 ```bash
 cd /path/to/ACE-Step-1.5
-uv run acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
-```
-
-**Windows (Standard Installation):**
-```batch
-cd C:\path\to\ACE-Step-1.5
 uv run acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
 ```
 
@@ -391,12 +316,6 @@ Wait for "API endpoints enabled" before proceeding.
 ```bash
 cd ace-step-ui
 ./start.sh
-```
-
-**Windows:**
-```batch
-cd ace-step-ui
-start.bat
 ```
 
 ### Step 3: Create Music!
@@ -490,7 +409,7 @@ Full control over every parameter:
 | **4GB GPU - Out of memory** | Use **PT** backend (default), batch size **1**, and keep **Thinking Mode OFF**. LLM features require 12GB+ |
 | **Genre always sounds like ballad** | Enable **AI Enhance** toggle in the Style section — it enriches your tags with proper metadata |
 | **AttributeError: 'NoneType'** | Update to latest ACE-Step-1.5 (fix merged in PR #109) |
-| **Songs show 0:00 duration** | Install FFmpeg: `sudo apt install ffmpeg` (Linux) or download from [ffmpeg.org](https://ffmpeg.org) (Windows) |
+| **Songs show 0:00 duration** | Install FFmpeg: `sudo apt install ffmpeg` |
 | **LAN access not working** | Check firewall allows ports 3000 and 3001 |
 
 ---

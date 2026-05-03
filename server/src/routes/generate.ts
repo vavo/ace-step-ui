@@ -1219,7 +1219,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
     if (keyScale) paramObj.key = keyScale;
     if (timeSignature) paramObj.time_signature = timeSignature;
 
-    // Primary path: call ACE-Step's /format_input REST endpoint (avoids Python spawn ENOENT on Windows)
+    // Primary path: call ACE-Step's /format_input REST endpoint instead of spawning Python.
     try {
       console.log(`[Format] Calling REST API: ${ACESTEP_API_URL}/format_input`);
       const apiRes = await fetch(`${ACESTEP_API_URL}/format_input`, {
