@@ -1093,7 +1093,7 @@ router.get('/random-description', authMiddleware, async (_req: AuthenticatedRequ
   } catch (error) {
     const fallback = getRandomDescriptionFallback();
     console.error('Random description error:', error);
-    res.status(500).json({
+    res.json({
       description: fallback.description,
       instrumental: fallback.instrumental,
       vocalLanguage: fallback.vocalLanguage,

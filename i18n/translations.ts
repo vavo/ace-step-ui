@@ -20,6 +20,10 @@ const enTranslations: TranslationBundle = {
     signIn: 'Sign In',
     signOut: 'Sign Out',
     settings: 'Settings',
+    continueWithGoogle: 'Continue with Google',
+    googleLoginUnavailable: 'Google login is not configured',
+    googleLoginRequired: 'Use Google to continue. Username login is only available in development.',
+    or: 'or',
     
     // Username Modal
     welcomeTitle: 'Welcome to ACE-Step UI',
@@ -2480,6 +2484,10 @@ export const translations: Record<string, TranslationBundle> = {
     signIn: 'Prihlásiť sa',
     signOut: 'Odhlásiť sa',
     settings: 'Nastavenia',
+    continueWithGoogle: 'Pokračovať cez Google',
+    googleLoginUnavailable: 'Google login nie je nastavený',
+    googleLoginRequired: 'Pokračuj cez Google. Login menom je iba pre vývoj.',
+    or: 'alebo',
     welcomeTitle: 'Vitajte v ACE-Step UI',
     welcomeSubtitle: 'Zadajte svoje meno a začnite tvoriť AI hudbu',
     yourName: 'Vaše meno',

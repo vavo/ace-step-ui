@@ -103,8 +103,16 @@ export interface SessionResponse {
   token: string | null;
 }
 
+export interface AuthOptions {
+  googleConfigured: boolean;
+  localAuthAllowed: boolean;
+}
+
 export const authApi = {
   googleStartUrl: '/api/auth/google/start',
+
+  options: (): Promise<AuthOptions> =>
+    api('/api/auth/options'),
 
   auto: (): Promise<AuthResponse> =>
     api('/api/auth/auto'),

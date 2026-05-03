@@ -50,6 +50,13 @@ function googleConfigured(): boolean {
   return Boolean(config.auth.googleClientId && config.auth.googleClientSecret);
 }
 
+router.get('/options', (_req: Request, res: Response) => {
+  res.json({
+    googleConfigured: googleConfigured(),
+    localAuthAllowed: isLocalAuthAllowed(),
+  });
+});
+
 function sanitizeUsername(username: string): string {
   return username
     .trim()
