@@ -181,23 +181,51 @@ router.get('/leaderboards', optionalAuthMiddleware, async (req: AuthenticatedReq
          FROM leaderboard_events
          WHERE period_start = ?
          GROUP BY user_id
+       ),
+       public_creator_totals AS (
+         SELECT user_id,
+                COUNT(*) as total_public_song_count,
+                COALESCE(SUM(like_count), 0) as total_likes_received
+         FROM songs
+         WHERE is_public = 1
+         GROUP BY user_id
        )
        SELECT u.id, u.username, u.avatar_url, u.bio, u.xp, u.level,
-              COALESCE(ws.published_song_count, 0) as published_song_count,
-              COALESCE(ws.likes_received, 0) as likes_received,
+              CASE
+                WHEN COALESCE(ws.published_song_count, 0) > 0 THEN COALESCE(ws.published_song_count, 0)
+                ELSE COALESCE(pct.total_public_song_count, 0)
+              END as published_song_count,
+              CASE
+                WHEN COALESCE(ws.likes_received, 0) > 0 THEN COALESCE(ws.likes_received, 0)
+                ELSE COALESCE(pct.total_likes_received, 0)
+              END as likes_received,
               COALESCE(wf.follower_growth, 0) as follower_growth,
               COALESCE(we.event_points, 0) as event_points,
-              (
-                COALESCE(ws.published_song_count, 0) * 20
-                + COALESCE(ws.likes_received, 0) * 5
-                + COALESCE(wf.follower_growth, 0) * 10
-                + COALESCE(we.event_points, 0)
-              ) as leaderboard_score
+              CASE
+                WHEN (
+                  COALESCE(ws.published_song_count, 0) * 20
+                  + COALESCE(ws.likes_received, 0) * 5
+                  + COALESCE(wf.follower_growth, 0) * 10
+                  + COALESCE(we.event_points, 0)
+                ) > 0 THEN (
+                  COALESCE(ws.published_song_count, 0) * 20
+                  + COALESCE(ws.likes_received, 0) * 5
+                  + COALESCE(wf.follower_growth, 0) * 10
+                  + COALESCE(we.event_points, 0)
+                )
+                ELSE (
+                  COALESCE(pct.total_public_song_count, 0) * 20
+                  + COALESCE(pct.total_likes_received, 0) * 5
+                  + COALESCE(u.xp, 0)
+                )
+              END as leaderboard_score
        FROM users u
        LEFT JOIN weekly_songs ws ON ws.user_id = u.id
        LEFT JOIN weekly_followers wf ON wf.user_id = u.id
        LEFT JOIN weekly_events we ON we.user_id = u.id
-       WHERE COALESCE(ws.published_song_count, 0) > 0
+       LEFT JOIN public_creator_totals pct ON pct.user_id = u.id
+       WHERE COALESCE(pct.total_public_song_count, 0) > 0
+          OR COALESCE(ws.published_song_count, 0) > 0
           OR COALESCE(ws.likes_received, 0) > 0
           OR COALESCE(wf.follower_growth, 0) > 0
           OR COALESCE(we.event_points, 0) > 0
