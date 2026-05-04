@@ -351,7 +351,7 @@ PORT=3001
 ACESTEP_API_URL=http://localhost:8001
 
 # Database (local-first, no cloud)
-DATABASE_PATH=./data/acestep.db
+DATABASE_PATH=./server/data/acestep.db
 
 # Optional: Pexels API for video backgrounds
 PEXELS_API_KEY=your_key_here

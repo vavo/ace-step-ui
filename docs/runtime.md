@@ -78,6 +78,7 @@ JWT_SECRET=replace_with_a_long_random_secret
 AUTH_SESSION_DAYS=30
 SUPERADMIN_EMAIL=owner@example.com
 PRODUCT_TIME_ZONE=Europe/Bratislava
+DATABASE_PATH=./server/data/acestep.db
 ACESTEP_API_URL=http://localhost:8001
 ```
 

@@ -46,7 +46,7 @@ NODE_ENV=development
 FRONTEND_PORT=3000
 
 # Database (SQLite)
-DATABASE_PATH=./data/acestep.db
+DATABASE_PATH=./server/data/acestep.db
 
 # ACE-Step API and local checkout
 ACESTEP_API_URL=http://localhost:8001

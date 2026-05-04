@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,6 +10,21 @@ const projectRoot = path.resolve(__dirname, '../../..');
 function resolveProjectPath(value: string | undefined, fallback: string): string {
   const resolved = value || fallback;
   return path.isAbsolute(resolved) ? resolved : path.resolve(projectRoot, resolved);
+}
+
+function resolveDatabasePath(value: string | undefined): string {
+  const configured = value?.trim();
+  const defaultishValues = new Set(['', './data/acestep.db', 'data/acestep.db']);
+  const configuredPath = resolveProjectPath(configured, 'data/acestep.db');
+  const legacyPath = path.resolve(projectRoot, 'server/data/acestep.db');
+
+  // Older RunPod starts ran the server from ./server, so DATABASE_PATH=./data/acestep.db
+  // actually meant ./server/data/acestep.db. Preserve that DB automatically.
+  if (defaultishValues.has(configured || '') && existsSync(legacyPath)) {
+    return legacyPath;
+  }
+
+  return configuredPath;
 }
 
 // Load the canonical root env even when the server is started with
@@ -24,7 +40,7 @@ export const config = {
 
   // SQLite database
   database: {
-    path: resolveProjectPath(process.env.DATABASE_PATH, 'data/acestep.db'),
+    path: resolveDatabasePath(process.env.DATABASE_PATH),
   },
 
   // ACE-Step API (local)
