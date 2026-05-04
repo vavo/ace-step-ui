@@ -28,6 +28,7 @@ import loraRoutes from './routes/lora.js';
 import trainingRoutes from './routes/training.js';
 import creditsRoutes from './routes/credits.js';
 import lyricsRoutes from './routes/lyrics.js';
+import ideasRoutes from './routes/ideas.js';
 import socialRoutes from './routes/social.js';
 import { pool } from './db/pool.js';
 import './db/migrate.js';
@@ -476,6 +477,7 @@ app.use('/api/lora', loraRoutes);
 app.use('/api/training', trainingRoutes);
 app.use('/api/credits', creditsRoutes);
 app.use('/api/lyrics', lyricsRoutes);
+app.use('/api/ideas', ideasRoutes);
 app.use('/api', socialRoutes);
 
 // Error handler

@@ -38,6 +38,15 @@ export interface Playlist {
   songs?: any[];
 }
 
+export interface LyricIdea {
+  id: string;
+  title: string;
+  lyrics: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Comment {
   id: string;
   songId: string;
@@ -168,4 +177,4 @@ export interface UserProfile {
 }
 
 // Simplified views for ACE-Step UI
-export type View = 'create' | 'feed' | 'leaderboard' | 'library' | 'training' | 'profile' | 'song' | 'playlist' | 'search';
+export type View = 'create' | 'feed' | 'ideas' | 'leaderboard' | 'library' | 'training' | 'profile' | 'song' | 'playlist' | 'search';

@@ -525,6 +525,29 @@ export const creditsApi = {
   }> => api('/api/credits/claim-daily', { method: 'POST', token }),
 };
 
+export interface LyricIdea {
+  id: string;
+  title: string;
+  lyrics: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const ideasApi = {
+  list: (token: string): Promise<{ ideas: LyricIdea[] }> =>
+    api('/api/ideas', { token }),
+
+  create: (params: { title?: string; lyrics?: string; notes?: string }, token: string): Promise<{ idea: LyricIdea }> =>
+    api('/api/ideas', { method: 'POST', body: params, token }),
+
+  update: (id: string, params: { title?: string; lyrics?: string; notes?: string }, token: string): Promise<{ idea: LyricIdea }> =>
+    api(`/api/ideas/${id}`, { method: 'PATCH', body: params, token }),
+
+  delete: (id: string, token: string): Promise<{ success: boolean }> =>
+    api(`/api/ideas/${id}`, { method: 'DELETE', token }),
+};
+
 export const lyricsApi = {
   draft: (params: {
     prompt: string;

@@ -18,6 +18,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { MobileBottomNav } from './components/MobileBottomNav';
 
 const FeedPage = lazy(() => import('./components/FeedPage').then((module) => ({ default: module.FeedPage })));
+const IdeasPage = lazy(() => import('./components/IdeasPage').then((module) => ({ default: module.IdeasPage })));
 const LeaderboardPage = lazy(() => import('./components/LeaderboardPage').then((module) => ({ default: module.LeaderboardPage })));
 const LibraryView = lazy(() => import('./components/LibraryView').then((module) => ({ default: module.LibraryView })));
 const PlaylistDetail = lazy(() => import('./components/PlaylistDetail').then((module) => ({ default: module.PlaylistDetail })));
@@ -262,6 +263,8 @@ function AppContent() {
       window.history.pushState({}, '', '/library');
     } else if (view === 'feed') {
       window.history.pushState({}, '', '/feed');
+    } else if (view === 'ideas') {
+      window.history.pushState({}, '', '/ideas');
     } else if (view === 'leaderboard') {
       window.history.pushState({}, '', '/leaderboard');
     } else if (view === 'search') {
@@ -314,6 +317,8 @@ function AppContent() {
         setCurrentView('library');
       } else if (path === '/feed') {
         setCurrentView('feed');
+      } else if (path === '/ideas') {
+        setCurrentView('ideas');
       } else if (path === '/leaderboard') {
         setCurrentView('leaderboard');
       } else if (path.startsWith('/@')) {
@@ -1394,6 +1399,9 @@ function AppContent() {
             onNavigateToCreate={() => handleNavigate('create')}
           />
         );
+
+      case 'ideas':
+        return <IdeasPage />;
 
       case 'leaderboard':
         return (

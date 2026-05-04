@@ -1,5 +1,5 @@
 import React from 'react';
-import { Disc, Library, LogIn, Radio, Trophy } from 'lucide-react';
+import { Disc, Library, Lightbulb, LogIn, Radio, Trophy } from 'lucide-react';
 import { View } from '../types';
 import { useI18n } from '../context/I18nContext';
 
@@ -22,7 +22,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   return (
     <nav className="md:hidden h-[70px] shrink-0 bg-white/95 dark:bg-black/95 border-t border-zinc-200 dark:border-white/10 backdrop-blur safe-area-inset-bottom z-50">
-      <div className="grid grid-cols-5 h-full">
+      <div className="grid grid-cols-6 h-full">
         <NavButton
           icon={<Disc size={20} />}
           label={t('mobileNavCreate')}
@@ -34,6 +34,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           label={t('mobileNavFeed')}
           active={currentView === 'feed'}
           onClick={() => onNavigate('feed')}
+        />
+        <NavButton
+          icon={<Lightbulb size={20} />}
+          label={t('mobileNavIdeas')}
+          active={currentView === 'ideas'}
+          onClick={() => onNavigate('ideas')}
         />
         <NavButton
           icon={<Trophy size={20} />}

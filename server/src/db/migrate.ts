@@ -132,6 +132,16 @@ CREATE TABLE IF NOT EXISTS reference_tracks (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS lyric_ideas (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  lyrics TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Contact submissions table
 CREATE TABLE IF NOT EXISTS contact_submissions (
   id TEXT PRIMARY KEY,
@@ -230,6 +240,8 @@ CREATE INDEX IF NOT EXISTS idx_followers_follower ON followers(follower_id);
 CREATE INDEX IF NOT EXISTS idx_followers_following ON followers(following_id);
 CREATE INDEX IF NOT EXISTS idx_reference_tracks_user_id ON reference_tracks(user_id);
 CREATE INDEX IF NOT EXISTS idx_reference_tracks_created_at ON reference_tracks(created_at);
+CREATE INDEX IF NOT EXISTS idx_lyric_ideas_user_id ON lyric_ideas(user_id);
+CREATE INDEX IF NOT EXISTS idx_lyric_ideas_updated_at ON lyric_ideas(updated_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub_unique ON users(google_sub) WHERE google_sub IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id);
