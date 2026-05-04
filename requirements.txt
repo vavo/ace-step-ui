@@ -10,3 +10,7 @@
 # - server/scripts/format_sample.py
 # - server/scripts/get_limits.py
 # - server/scripts/preprocess_dataset.py
+
+bitsandbytes
+pyWavelets
+pytorch_wavelets

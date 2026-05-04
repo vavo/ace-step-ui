@@ -26,6 +26,7 @@ import { transcodeToWav } from './audioTranscode.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const AUDIO_DIR = config.storage.audioDir;
+const LEGACY_AUDIO_DIR = path.resolve(__dirname, '../../public/audio');
 
 const ACESTEP_API = config.acestep.apiUrl;
 
@@ -95,15 +96,20 @@ function resolveRequestedDuration(params: Pick<GenerationParams, 'duration'>): n
 /**
  * Resolve an audio URL (e.g. /audio/file.mp3) to an absolute local file path.
  */
-function resolveAudioPath(audioUrl: string): string {
+function uniquePaths(paths: string[]): string[] {
+  return Array.from(new Set(paths.filter(Boolean)));
+}
+
+function audioStorageKey(audioUrl: string): string | null {
   if (audioUrl.startsWith('/audio/')) {
-    return path.resolve(AUDIO_DIR, audioUrl.replace('/audio/', ''));
+    return audioUrl.replace('/audio/', '');
   }
+
   if (audioUrl.startsWith('http')) {
     try {
       const parsed = new URL(audioUrl);
       if (parsed.pathname.startsWith('/audio/')) {
-        return path.resolve(AUDIO_DIR, parsed.pathname.replace('/audio/', ''));
+        return parsed.pathname.replace('/audio/', '');
       }
     } catch { /* fall through */ }
   }
@@ -111,14 +117,37 @@ function resolveAudioPath(audioUrl: string): string {
   const normalized = audioUrl.replace(/\\/g, '/');
   const publicAudioIndex = normalized.indexOf('public/audio/');
   if (publicAudioIndex >= 0) {
-    return path.resolve(AUDIO_DIR, normalized.slice(publicAudioIndex + 'public/audio/'.length));
+    return normalized.slice(publicAudioIndex + 'public/audio/'.length);
+  }
+
+  return null;
+}
+
+function resolveAudioPathCandidates(audioUrl: string): string[] {
+  const key = audioStorageKey(audioUrl);
+  if (key) {
+    const candidates = [
+      path.resolve(AUDIO_DIR, key),
+      path.resolve(LEGACY_AUDIO_DIR, key),
+    ];
+
+    if (path.isAbsolute(audioUrl)) {
+      candidates.push(audioUrl);
+    }
+
+    return uniquePaths(candidates);
   }
 
   if (!path.isAbsolute(audioUrl)) {
-    return path.resolve(audioUrl);
+    return [path.resolve(audioUrl)];
   }
 
-  return audioUrl;
+  return [audioUrl];
+}
+
+function resolveAudioPath(audioUrl: string): string {
+  const candidates = resolveAudioPathCandidates(audioUrl);
+  return candidates.find(candidate => existsSync(candidate)) || candidates[0];
 }
 
 /**
@@ -954,7 +983,7 @@ export async function getAudioStream(audioPath: string): Promise<Response> {
   }
 
   if (audioPath.startsWith('/audio/')) {
-    const localPath = path.join(AUDIO_DIR, audioPath.replace('/audio/', ''));
+    const localPath = resolveAudioPath(audioPath);
     try {
       const buffer = await readFile(localPath);
       const ext = getAudioExtension(localPath) || '.mp3';
