@@ -1,7 +1,7 @@
 # Parallel MVP Plan: Multi-User Slovak Teen Product
 
 ## Summary
-Keep SQLite for MVP, use email/password plus Google OAuth, daily credits, OpenAI lyric drafting, mobile-first UX, public social loops, weekly leaderboards, and add Stripe subscriptions last.
+Keep SQLite for MVP, use email/password plus Google OAuth, daily credits, OpenAI lyric drafting and prompt refinement, mobile-first UX, public social loops, weekly leaderboards, and add Stripe subscriptions last.
 
 Run this as a short sequential stabilization phase, then two parallel implementation waves. The important trick: lock API contracts first so backend and frontend can move independently instead of politely blocking each other like it’s 2009.
 
@@ -39,6 +39,7 @@ Owner writes mainly server/database/auth/generation code.
   - Streak bonus: `+5/day`, max `+25`
   - Lyrics draft: `2`
   - Audio generation: `20` per variation
+- Superadmin/admin users have unlimited credits. Configure by `SUPERADMIN_EMAIL` or comma-separated `SUPERADMIN_EMAILS`; matching Google OAuth or email users are promoted to admin on login.
 - Update generation to reserve credits before ACE-Step starts and refund exactly once on failure/cancel.
 - Keep ACE-Step expert params server-side behind presets.
 
@@ -52,6 +53,8 @@ Owner writes mainly React UI, i18n, API client wrappers.
   - editable lyrics preview
   - “Vytvoriť song” with visible credit cost
 - Add `POST /api/lyrics/draft` client flow using the locked contract.
+- AI prompt refinement uses configured OpenAI/Gemini first with a strict system prompt that preserves explicit user intent: genre, language, vocal gender/tone, mood, BPM, duration, key, time signature, and vocal/instrumental intent.
+- ACE-Step `/format_input` is fallback only for prompt refinement because it can rewrite user intent too aggressively.
 - Hide advanced controls under `More options`.
 - Move model, CFG, LM backend, temperature, LoRA, key/BPM/time signature into admin/dev Expert Mode.
 - Make mobile create screen the primary layout.
@@ -127,6 +130,7 @@ Must be last after free credits and core retention loops work.
   - `POST /api/credits/claim-daily`
 - Generation:
   - `POST /api/generate`
+  - `POST /api/generate/format`
   - `GET /api/generate/status/:jobId`
 - Social:
   - `GET /api/feed`
@@ -139,7 +143,7 @@ Must be last after free credits and core retention loops work.
 ## Test Plan
 - Phase 0: frontend and server builds pass.
 - Track A: OAuth, sessions, signup credits, daily claim, streak bonus, reserve/refund, insufficient credits.
-- Track B: prompt-to-lyrics, lyrics editing, hidden advanced options, mobile create flow, OpenAI failure state.
+- Track B: prompt-to-lyrics, AI prompt refinement preserving explicit genre/language/vocal/mood/BPM intent, lyrics editing, hidden advanced options, mobile create flow, OpenAI failure state.
 - Track C: feed, public/private songs, likes/comments/follows, leaderboard ranking, XP events, badge grants.
 - Track D: mobile screenshots for create/feed/leaderboard/profile/library at 390px and desktop width.
 - Final phase: Stripe checkout, webhook idempotency, Pro upgrade, cancellation downgrade.

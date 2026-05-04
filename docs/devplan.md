@@ -61,6 +61,14 @@ Prepare multi-user foundation without adding Google OAuth yet.
 - Add small service helpers for user payloads, credits, and ledger writes.
 - Commit once schema and tests/build pass.
 
+## Current Implementation Notes
+
+- Google OAuth and email/password auth are implemented with session restore.
+- Credit accounting is implemented for lyrics and generation, including reserve/refund and daily claims.
+- Superadmin/admin users have unlimited credits through `SUPERADMIN_EMAIL`, `SUPERADMIN_EMAILS`, or `is_admin = 1`.
+- AI prompt refinement now uses configured OpenAI/Gemini first with strict system instructions, then falls back to ACE-Step formatting.
+- Prompt refinement should preserve explicit user intent: genre, language, vocal gender/tone, mood/emotion, BPM, duration, key, time signature, and vocal/instrumental intent.
+
 ## Assumptions
 - Implementation starts in the current repo at `/Users/vavo/.codex/worktrees/2a7b/ace-step-ui`.
 - No branch or PR unless explicitly requested.
