@@ -247,6 +247,21 @@ function includesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some(pattern => pattern.test(text));
 }
 
+const FORMAT_SYSTEM_PROMPT = `
+You are a strict music prompt formatter for an AI music generator.
+Your job is to improve the user's prompt, not reinterpret it.
+
+Rules:
+- Preserve every explicit user constraint: genre, subgenre, language, vocal gender, vocal tone, mood/emotion, BPM, key, time signature, duration, instrumentation, and vocal vs instrumental intent.
+- Never replace a requested genre with a different genre.
+- Never turn a vocal request into an instrumental request unless the user explicitly asks for instrumental.
+- Never add novelty concepts, meme elements, sound effects, or unrelated instruments unless the user asks for them.
+- If the user writes in Slovak/Czech or requests Slovak/Czech vocals, preserve that language request.
+- If the user specifies vocal gender or tone, keep it in the caption.
+- If a parameter is not specified, you may infer a reasonable value, but do not override specified values.
+- Return only valid JSON matching the requested schema.
+`.trim();
+
 type IntentRule = {
   label: string;
   phrase: string;
@@ -514,7 +529,10 @@ async function formatWithOpenAI(input: GeminiFormatInput): Promise<GeminiFormatR
     const model = config.openai.model;
     const payload: Record<string, unknown> = {
       model,
-      messages: [{ role: 'user', content: payloadPrompt }],
+      messages: [
+        { role: 'system', content: FORMAT_SYSTEM_PROMPT },
+        { role: 'user', content: payloadPrompt },
+      ],
       response_format: { type: 'json_object' },
     };
 
@@ -604,6 +622,9 @@ async function formatWithGemini(input: GeminiFormatInput): Promise<GeminiFormatR
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: FORMAT_SYSTEM_PROMPT }],
+        },
         contents: [{ parts: [{ text: payloadPrompt }] }],
         generationConfig: {
           temperature: input.temperature ?? 0.85,
@@ -1520,7 +1541,26 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
     if (keyScale) paramObj.key = keyScale;
     if (timeSignature) paramObj.time_signature = timeSignature;
 
-    // Primary path: call ACE-Step's /format_input REST endpoint instead of spawning Python.
+    const providerInput = {
+      caption,
+      lyrics: lyrics || undefined,
+      bpm: bpm,
+      duration: duration,
+      keyScale: keyScale || undefined,
+      timeSignature: timeSignature || undefined,
+      temperature: temperature,
+      topK: topK,
+      topP: topP,
+    };
+
+    // Primary path: use configured OpenAI/Gemini formatter with strict system instructions.
+    const providerResult = await formatWithConfiguredProvider(providerInput);
+    if (providerResult && (providerResult.caption || providerResult.lyrics)) {
+      res.json(preserveExplicitFormatIntent(providerInput, providerResult));
+      return;
+    }
+
+    // Fallback path: call ACE-Step's /format_input REST endpoint instead of spawning Python.
     try {
       console.log(`[Format] Calling REST API: ${ACESTEP_API_URL}/format_input`);
       const apiRes = await fetch(`${ACESTEP_API_URL}/format_input`, {
@@ -1541,30 +1581,10 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
         const errMsg = apiData.error || apiData.detail || `Format API returned ${apiRes.status}`;
         console.error('[Format] API error:', errMsg);
 
-        const fallbackResult = await formatWithConfiguredProvider({
-          caption,
-          lyrics: lyrics || undefined,
-          bpm: bpm,
-          duration: duration,
-          keyScale: keyScale || undefined,
-          timeSignature: timeSignature || undefined,
-          temperature: temperature,
-          topK: topK,
-          topP: topP,
-        });
+        const fallbackResult = await formatWithConfiguredProvider(providerInput);
 
         if (fallbackResult && (fallbackResult.caption || fallbackResult.lyrics)) {
-          res.json(preserveExplicitFormatIntent({
-            caption,
-            lyrics: lyrics || undefined,
-            bpm: bpm,
-            duration: duration,
-            keyScale: keyScale || undefined,
-            timeSignature: timeSignature || undefined,
-            temperature: temperature,
-            topK: topK,
-            topP: topP,
-          }, fallbackResult));
+          res.json(preserveExplicitFormatIntent(providerInput, fallbackResult));
           return;
         }
 
@@ -1583,17 +1603,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
       }
 
       const d = apiData.data;
-      res.json(preserveExplicitFormatIntent({
-        caption,
-        lyrics: lyrics || undefined,
-        bpm: bpm,
-        duration: duration,
-        keyScale: keyScale || undefined,
-        timeSignature: timeSignature || undefined,
-        temperature: temperature,
-        topK: topK,
-        topP: topP,
-      }, {
+      res.json(preserveExplicitFormatIntent(providerInput, {
         caption: d.caption,
         lyrics: d.lyrics,
         bpm: d.bpm,
@@ -1604,30 +1614,10 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
       }));
       return;
     } catch (fetchErr: any) {
-      const fallbackResult = await formatWithConfiguredProvider({
-        caption,
-        lyrics: lyrics || undefined,
-        bpm: bpm,
-        duration: duration,
-        keyScale: keyScale || undefined,
-        timeSignature: timeSignature || undefined,
-        temperature: temperature,
-        topK: topK,
-        topP: topP,
-      });
+      const fallbackResult = await formatWithConfiguredProvider(providerInput);
 
       if (fallbackResult && (fallbackResult.caption || fallbackResult.lyrics)) {
-        res.json(preserveExplicitFormatIntent({
-          caption,
-          lyrics: lyrics || undefined,
-          bpm: bpm,
-          duration: duration,
-          keyScale: keyScale || undefined,
-          timeSignature: timeSignature || undefined,
-          temperature: temperature,
-          topK: topK,
-          topP: topP,
-        }, fallbackResult));
+        res.json(preserveExplicitFormatIntent(providerInput, fallbackResult));
         return;
       }
 
@@ -1704,17 +1694,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
     });
 
     if (result.success && result.data) {
-      res.json(preserveExplicitFormatIntent({
-        caption,
-        lyrics: lyrics || undefined,
-        bpm: bpm,
-        duration: duration,
-        keyScale: keyScale || undefined,
-        timeSignature: timeSignature || undefined,
-        temperature: temperature,
-        topK: topK,
-        topP: topP,
-      }, result.data));
+      res.json(preserveExplicitFormatIntent(providerInput, result.data));
     } else {
       console.error('[Format] Python error:', result.error);
       res.status(500).json({ success: false, error: result.error });
