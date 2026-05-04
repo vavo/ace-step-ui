@@ -42,6 +42,7 @@ function cookieOptions(maxAgeMs: number) {
 
 export function buildUserPayload(user: { [key: string]: unknown }) {
   const isSuperadmin = isSuperadminEmail(user.email);
+  const isAdmin = Boolean(user.is_admin) || isSuperadmin;
   return {
     id: user.id,
     username: user.username,
@@ -51,15 +52,15 @@ export function buildUserPayload(user: { [key: string]: unknown }) {
     bio: user.bio,
     avatar_url: user.avatar_url,
     banner_url: user.banner_url,
-    isAdmin: Boolean(user.is_admin) || isSuperadmin,
+    isAdmin,
     createdAt: user.created_at,
     created_at: user.created_at,
     default_vocal_language: user.default_vocal_language || 'en',
     default_ui_language: user.default_ui_language || 'sk',
     plan: user.plan || 'free',
-    accountTier: isSuperadmin ? 'superadmin' : user.plan || 'free',
-    credit_balance: user.credit_balance ?? 0,
-    unlimitedCredits: isSuperadmin,
+    accountTier: isSuperadmin ? 'superadmin' : isAdmin ? 'admin' : user.plan || 'free',
+    credit_balance: isAdmin ? 999_999_999 : user.credit_balance ?? 0,
+    unlimitedCredits: isAdmin,
     xp: user.xp ?? 0,
     level: user.level ?? 1,
   };

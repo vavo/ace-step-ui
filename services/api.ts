@@ -686,6 +686,7 @@ export interface Playlist {
   description?: string;
   cover_url?: string;
   is_public?: boolean;
+  isPublic?: boolean;
   user_id?: string;
   created_at?: string;
   song_count?: number;

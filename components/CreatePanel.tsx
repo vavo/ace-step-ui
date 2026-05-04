@@ -22,6 +22,7 @@ interface ReferenceTrack {
 
 interface CreatePanelProps {
   onGenerate: (params: GenerationParams) => void;
+  onInsufficientCredits?: () => void;
   isGenerating: boolean;
   initialData?: { song: Song, timestamp: number } | null;
   createdSongs?: Song[];
@@ -84,6 +85,7 @@ function readStoredInt(key: string, fallback: number, min: number, max: number):
 
 export const CreatePanel: React.FC<CreatePanelProps> = ({
   onGenerate,
+  onInsufficientCredits,
   isGenerating,
   initialData,
   createdSongs = [],
@@ -1089,6 +1091,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const handleGenerate = () => {
     if (!hasEnoughCredits) {
       setCreditMessage(t('needCredits').replace('{count}', String(generationCreditCost - (creditInfo?.balance ?? 0))));
+      onInsufficientCredits?.();
       return;
     }
 
@@ -2850,7 +2853,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         <button
           onClick={handleGenerate}
           className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110"
-          disabled={isGenerating || !isAuthenticated || !hasEnoughCredits}
+          disabled={isGenerating || !isAuthenticated}
         >
           <Sparkles size={18} />
           <span>

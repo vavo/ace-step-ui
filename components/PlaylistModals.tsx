@@ -6,22 +6,24 @@ import { useI18n } from '../context/I18nContext';
 interface CreatePlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, description: string) => void;
+  onCreate: (name: string, description: string, isPublic: boolean) => void;
 }
 
 export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({ isOpen, onClose, onCreate }) => {
   const { t } = useI18n();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onCreate(name, description);
+      onCreate(name, description, isPublic);
       setName('');
       setDescription('');
+      setIsPublic(true);
       onClose();
     }
   };
@@ -56,6 +58,23 @@ export const CreatePlaylistModal: React.FC<CreatePlaylistModalProps> = ({ isOpen
               placeholder={t('descriptionPlaceholder')}
             />
           </div>
+          <button
+            type="button"
+            onClick={() => setIsPublic(prev => !prev)}
+            className="w-full flex items-center justify-between rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-black/40 px-4 py-3 text-left transition-colors hover:border-zinc-300 dark:hover:border-white/20"
+          >
+            <div>
+              <div className="text-sm font-semibold text-zinc-900 dark:text-white">
+                {isPublic ? t('public') : t('private')}
+              </div>
+              <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                {isPublic ? 'Visible on your profile and in search.' : 'Only you can open this playlist.'}
+              </div>
+            </div>
+            <span className={`relative h-6 w-11 rounded-full transition-colors ${isPublic ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+            </span>
+          </button>
           <div className="flex justify-end gap-3 mt-6">
             <button
               type="button"

@@ -741,7 +741,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
 
     creditCost = calculateGenerationCreditCost(batchSize);
     const creditSummary = getCreditSummary(req.user!.id);
-    if (creditSummary.balance < creditCost) {
+    if (!creditSummary.unlimited && creditSummary.balance < creditCost) {
       res.status(402).json({
         error: 'Insufficient credits',
         creditBalance: creditSummary.balance,

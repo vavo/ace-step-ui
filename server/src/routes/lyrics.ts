@@ -128,7 +128,7 @@ router.post('/draft', authMiddleware, async (req: AuthenticatedRequest, res: Res
     }
 
     const summary = getCreditSummary(req.user!.id);
-    if (summary.balance < CREDIT_AMOUNTS.lyricDraft) {
+    if (!summary.unlimited && summary.balance < CREDIT_AMOUNTS.lyricDraft) {
       res.status(402).json({
         error: 'Insufficient credits',
         creditBalance: summary.balance,

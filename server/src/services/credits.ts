@@ -36,6 +36,7 @@ export class InsufficientCreditsError extends Error {
 type UserCreditRow = {
   id: string;
   email: string | null;
+  is_admin: number | null;
   credit_balance: number | null;
   last_daily_credit_claim_at: string | null;
   credit_streak_days: number | null;
@@ -73,7 +74,7 @@ export function calculateGenerationCreditCost(variationCount: number | undefined
 
 export function getCreditSummary(userId: string): CreditSummary {
   const row = db.prepare(
-    `SELECT id, email, credit_balance, last_daily_credit_claim_at, credit_streak_days
+    `SELECT id, email, is_admin, credit_balance, last_daily_credit_claim_at, credit_streak_days
      FROM users
      WHERE id = ?`
   ).get(userId) as UserCreditRow | undefined;
@@ -82,7 +83,7 @@ export function getCreditSummary(userId: string): CreditSummary {
     throw new Error('User not found');
   }
 
-  if (isSuperadminEmail(row.email)) {
+  if (Boolean(row.is_admin) || isSuperadminEmail(row.email)) {
     return {
       balance: SUPERADMIN_DISPLAY_BALANCE,
       lastDailyClaimAt: row.last_daily_credit_claim_at,

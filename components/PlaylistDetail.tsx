@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Song, Playlist, playlistsApi, songsApi, getAudioUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { ArrowLeft, Play, MoreHorizontal, Clock, Calendar, Shuffle, Trash2, Mic2, Music } from 'lucide-react';
+import { ArrowLeft, Play, Clock, Trash2, Music, Globe2, Lock } from 'lucide-react';
 
 interface PlaylistDetailProps {
     playlistId: string;
@@ -10,9 +10,10 @@ interface PlaylistDetailProps {
     onPlaySong: (song: Song, list?: Song[]) => void;
     onSelect: (song: Song) => void;
     onNavigateToProfile: (username: string) => void;
+    onPlaylistUpdated?: (playlist: Playlist) => void;
 }
 
-export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBack, onPlaySong, onSelect, onNavigateToProfile }) => {
+export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBack, onPlaySong, onSelect, onNavigateToProfile, onPlaylistUpdated }) => {
     const { user: currentUser, token } = useAuth();
     const { t } = useI18n();
     const [playlist, setPlaylist] = useState<Playlist & { creator_avatar?: string } | null>(null);
@@ -75,6 +76,18 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBa
             onBack();
         } catch (error) {
             console.error('Failed to delete playlist:', error);
+        }
+    };
+
+    const handleTogglePrivacy = async () => {
+        if (!token || !playlist) return;
+        const nextPublic = !playlist.is_public;
+        try {
+            const result = await playlistsApi.update(playlist.id, { isPublic: nextPublic }, token);
+            setPlaylist(result.playlist as any);
+            onPlaylistUpdated?.(result.playlist as any);
+        } catch (error) {
+            console.error('Failed to update playlist privacy:', error);
         }
     };
 
@@ -168,6 +181,17 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBa
                 >
                     <Play size={24} fill="currentColor" className="ml-1" />
                 </button>
+
+                {isOwner && (
+                    <button
+                        onClick={handleTogglePrivacy}
+                        className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs md:text-sm font-semibold text-white hover:bg-white/15 transition-colors"
+                        title={playlist.is_public ? t('private') : t('public')}
+                    >
+                        {playlist.is_public ? <Globe2 size={16} /> : <Lock size={16} />}
+                        {playlist.is_public ? t('public') : t('private')}
+                    </button>
+                )}
 
                 {isOwner && (
                     <button

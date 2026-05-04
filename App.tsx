@@ -1246,10 +1246,10 @@ function AppContent() {
     });
   };
 
-  const createPlaylist = async (name: string, description: string) => {
+  const createPlaylist = async (name: string, description: string, isPublic: boolean) => {
     if (!token) return;
     try {
-      const res = await playlistsApi.create(name, description, true, token);
+      const res = await playlistsApi.create(name, description, isPublic, token);
       setPlaylists(prev => [res.playlist, ...prev]);
 
       if (songToAddToPlaylist) {
@@ -1394,6 +1394,9 @@ function AppContent() {
           <PlaylistDetail
             playlistId={viewingPlaylistId}
             onBack={handleBackFromPlaylist}
+            onPlaylistUpdated={(updatedPlaylist) => {
+              setPlaylists(prev => prev.map(playlist => playlist.id === updatedPlaylist.id ? { ...playlist, ...updatedPlaylist } : playlist));
+            }}
             onPlaySong={playSong}
             onSelect={(s) => {
               setSelectedSong(s);
@@ -1473,6 +1476,7 @@ function AppContent() {
             `}>
               <CreatePanel
                 onGenerate={handleGenerate}
+                onInsufficientCredits={() => setShowInsufficientCreditsModal(true)}
                 isGenerating={isGenerating}
                 initialData={reuseData}
                 createdSongs={songs}
