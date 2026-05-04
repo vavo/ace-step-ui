@@ -73,6 +73,25 @@ const DEFAULT_GENERATION_LIMITS = {
   fallback: true,
 };
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || '');
+}
+
+function isStorageExhaustedError(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code || '')
+    : '';
+  const message = errorMessage(error);
+  return code === 'SQLITE_IOERR_WRITE'
+    || code === 'SQLITE_FULL'
+    || code === 'ENOSPC'
+    || /disk i\/o error|disk quota exceeded|no space left on device/i.test(message);
+}
+
+function isIncompleteAceStepModelError(message: string): boolean {
+  return /No \.safetensors files found|no file named .*model\.safetensors|failed to download|Disk quota exceeded/i.test(message);
+}
+
 const RANDOM_DESCRIPTION_FALLBACKS = [
   'A mellow lo-fi chill track with soft piano chords and warm ambient pads.',
   'An energetic 80s-inspired synthwave song with nostalgic arpeggios and punchy drums.',
@@ -744,7 +763,14 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       });
       return;
     }
-    res.status(500).json({ error: (error as Error).message || 'Generation failed' });
+    if (isStorageExhaustedError(error)) {
+      res.status(507).json({
+        code: 'SERVER_STORAGE_FULL',
+        error: 'Server storage is full. Free disk space or attach a larger volume, then restart ACE-Step and the app.',
+      });
+      return;
+    }
+    res.status(500).json({ error: errorMessage(error) || 'Generation failed' });
   }
 });
 
@@ -1257,6 +1283,16 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
           return;
         }
 
+        if (isIncompleteAceStepModelError(errMsg)) {
+          res.status(503).json({
+            success: false,
+            code: 'ACESTEP_MODEL_INCOMPLETE',
+            error: 'ACE-Step model download is incomplete. Free disk space, remove partial checkpoint folders, re-download the missing model files, then restart ACE-Step.',
+            detail: errMsg,
+          });
+          return;
+        }
+
         res.status(500).json({ success: false, error: errMsg });
         return;
       }
@@ -1370,7 +1406,14 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
     }
   } catch (error) {
     console.error('[Format] Route error:', error);
-    res.status(500).json({ error: (error as Error).message });
+    if (isStorageExhaustedError(error)) {
+      res.status(507).json({
+        code: 'SERVER_STORAGE_FULL',
+        error: 'Server storage is full. Free disk space or attach a larger volume, then restart ACE-Step and the app.',
+      });
+      return;
+    }
+    res.status(500).json({ error: errorMessage(error) });
   }
 });
 

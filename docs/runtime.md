@@ -89,3 +89,26 @@ Register that exact Google callback URL in Google Cloud Console.
 ## Python Runtime
 
 The Python scripts under `server/scripts` are thin wrappers around ACE-Step. Run them with the ACE-Step Python environment and set `ACESTEP_PATH` or `PYTHON_PATH` when your install is not in the default location.
+
+## RunPod Disk Full Recovery
+
+If ACE-Step logs `Disk quota exceeded`, `No .safetensors files found`, or the app logs `SQLITE_IOERR_WRITE`, the pod storage is full. ACE-Step checkpoint downloads are partially written and SQLite cannot safely write credits/jobs.
+
+Check space:
+
+```bash
+df -h /workspace /tmp "$HOME"
+du -h -d 1 /workspace/ace/ACE-Step-1.5/checkpoints "$HOME/.cache/modelscope" "$HOME/.cache/huggingface" 2>/dev/null | sort -h
+```
+
+Remove partial ACE-Step downloads before retrying:
+
+```bash
+rm -rf /workspace/ace/ACE-Step-1.5/checkpoints/acestep-5Hz-lm-1.7B
+rm -rf /workspace/ace/ACE-Step-1.5/checkpoints/acestep-v15-turbo
+rm -rf /workspace/ace/ACE-Step-1.5/checkpoints/vae
+rm -rf /workspace/ace/ACE-Step-1.5/checkpoints/Qwen3-Embedding-0.6B
+rm -rf "$HOME/.cache/modelscope/hub/models/ACE-Step/Ace-Step1.5"
+```
+
+Make sure at least 20 GB is free, then restart ACE-Step so it can re-download complete checkpoint files. If the pod cannot provide that much free space, attach a larger RunPod volume. Restart the UI server after ACE-Step is healthy.
