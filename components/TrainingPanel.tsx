@@ -696,7 +696,7 @@ export const TrainingPanel: React.FC = () => {
         <Section title={
           <button onClick={() => setShowModelConfig(!showModelConfig)} className="flex items-center gap-1.5 w-full text-left">
             <Settings size={12} />
-            <span>Model Configuration</span>
+            <span>{t('modelConfiguration')}</span>
             <ChevronRight size={12} className={`ml-auto transition-transform ${showModelConfig ? 'rotate-90' : ''}`} />
           </button>
         }>
@@ -706,7 +706,7 @@ export const TrainingPanel: React.FC = () => {
                 <FieldRow label="Checkpoint">
                   <select value={selectedCheckpoint} onChange={e => setSelectedCheckpoint(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200">
                     {modelCheckpoints.map(c => <option key={c} value={c}>{c}</option>)}
-                    {modelCheckpoints.length === 0 && <option value="">No checkpoints found</option>}
+                    {modelCheckpoints.length === 0 && <option value="">{t('noCheckpointsFound')}</option>}
                   </select>
                 </FieldRow>
                 <button onClick={handleRefreshCheckpoints} className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-zinc-400">
@@ -716,7 +716,7 @@ export const TrainingPanel: React.FC = () => {
               <FieldRow label="Config">
                 <select value={selectedConfig} onChange={e => setSelectedConfig(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200">
                   {modelConfigs.map(c => <option key={c} value={c}>{c}</option>)}
-                  {modelConfigs.length === 0 && <option value="">No configs found</option>}
+                  {modelConfigs.length === 0 && <option value="">{t('noConfigsFound')}</option>}
                 </select>
               </FieldRow>
               <div className="grid grid-cols-2 gap-2">
@@ -759,7 +759,7 @@ export const TrainingPanel: React.FC = () => {
               </div>
               {initLlm && (
                 <FieldRow label="LM Model">
-                  <input type="text" value={lmModelPath} onChange={e => setLmModelPath(e.target.value)} placeholder="LM model path" className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200" />
+                  <input type="text" value={lmModelPath} onChange={e => setLmModelPath(e.target.value)} placeholder={t('lmModelPathPlaceholder')} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-zinc-200" />
                 </FieldRow>
               )}
               <button onClick={handleInitModel} disabled={modelInitializing} className="w-full py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-50">
@@ -781,7 +781,7 @@ export const TrainingPanel: React.FC = () => {
                 className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${isDragOver ? 'border-pink-500 bg-pink-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.02]'}`}
               >
                 <Upload size={24} className={`mx-auto mb-2 ${isDragOver ? 'text-pink-400' : 'text-zinc-500'}`} />
-                <p className="text-xs text-zinc-400">Drop audio files here or click to browse</p>
+                <p className="text-xs text-zinc-400">{t('dropAudioFilesHere')}</p>
                 <p className="text-[10px] text-zinc-600 mt-1">.wav, .mp3, .flac, .ogg, .opus</p>
                 <input ref={fileInputRef} type="file" multiple accept=".wav,.mp3,.flac,.ogg,.opus" onChange={handleFileSelect} className="hidden" />
               </div>
@@ -812,9 +812,9 @@ export const TrainingPanel: React.FC = () => {
             </Section>
 
             {/* Scan Directory */}
-            <Section title="Scan Directory">
+            <Section title={t('scanDirectory')}>
               <div className="flex gap-2">
-                <input type="text" value={scanDir} onChange={e => setScanDir(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" placeholder="./path/to/audio/folder" />
+                <input type="text" value={scanDir} onChange={e => setScanDir(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" placeholder={t('scanDirPlaceholder')} />
                 <button onClick={handleScanDirectory} disabled={scanning || !scanDir} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50">
                   {scanning ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                   Scan
@@ -872,7 +872,7 @@ export const TrainingPanel: React.FC = () => {
                       <input type="text" value={datasetSettings.datasetName} onChange={e => setDatasetSettings(s => ({ ...s, datasetName: e.target.value }))} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" />
                     </FieldRow>
                     <FieldRow label={t('customActivationTag')}>
-                      <input type="text" value={datasetSettings.customTag} onChange={e => setDatasetSettings(s => ({ ...s, customTag: e.target.value }))} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" placeholder="e.g. my_style" />
+                      <input type="text" value={datasetSettings.customTag} onChange={e => setDatasetSettings(s => ({ ...s, customTag: e.target.value }))} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" placeholder={t('customTagPlaceholder')} />
                     </FieldRow>
                     <FieldRow label={t('tagPosition')}>
                       <select value={datasetSettings.tagPosition} onChange={e => setDatasetSettings(s => ({ ...s, tagPosition: e.target.value as DatasetSettings['tagPosition'] }))} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50">
@@ -926,9 +926,9 @@ export const TrainingPanel: React.FC = () => {
                 <Section title={`${t('editSample')} (${currentSampleIdx + 1}/${sampleCount})`}>
                   {/* Sample Navigation */}
                   <div className="flex items-center gap-2 mb-2">
-                    <button onClick={() => handleSampleNavigate(currentSampleIdx - 1)} disabled={currentSampleIdx <= 0} className="px-2 py-1 bg-white/5 hover:bg-white/10 text-zinc-300 rounded text-xs disabled:opacity-30">Prev</button>
+                    <button onClick={() => handleSampleNavigate(currentSampleIdx - 1)} disabled={currentSampleIdx <= 0} className="px-2 py-1 bg-white/5 hover:bg-white/10 text-zinc-300 rounded text-xs disabled:opacity-30">{t('previous')}</button>
                     <input type="number" min={1} max={sampleCount} value={currentSampleIdx + 1} onChange={e => { const v = parseInt(e.target.value) - 1; if (v >= 0 && v < sampleCount) handleSampleNavigate(v); }} className="w-16 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-center text-zinc-200" />
-                    <button onClick={() => handleSampleNavigate(currentSampleIdx + 1)} disabled={currentSampleIdx >= sampleCount - 1} className="px-2 py-1 bg-white/5 hover:bg-white/10 text-zinc-300 rounded text-xs disabled:opacity-30">Next</button>
+                    <button onClick={() => handleSampleNavigate(currentSampleIdx + 1)} disabled={currentSampleIdx >= sampleCount - 1} className="px-2 py-1 bg-white/5 hover:bg-white/10 text-zinc-300 rounded text-xs disabled:opacity-30">{t('next')}</button>
                     <span className="text-[10px] text-zinc-500 ml-auto truncate max-w-[100px]">{currentSample?.filename || ''}</span>
                   </div>
 
@@ -955,38 +955,38 @@ export const TrainingPanel: React.FC = () => {
                       </select>
                     </FieldRow>
                     <div>
-                      <label className="text-[11px] text-zinc-500 mb-0.5 block">Lyrics ({t('editableUsedForTraining')})</label>
+                      <label className="text-[11px] text-zinc-500 mb-0.5 block">{t('lyrics')} ({t('editableUsedForTraining')})</label>
                       <textarea value={editLyrics} onChange={e => setEditLyrics(e.target.value)} rows={3} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50 resize-none" />
                     </div>
                     {editRawLyrics && (
                       <div>
-                        <label className="text-[11px] text-zinc-500 mb-0.5 block">Raw Lyrics (read-only)</label>
+                        <label className="text-[11px] text-zinc-500 mb-0.5 block">{t('rawLyricsReadOnly')}</label>
                         <textarea value={editRawLyrics} readOnly rows={3} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-400 resize-none opacity-60" />
                       </div>
                     )}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[11px] text-zinc-500 mb-0.5 block">BPM</label>
+                        <label className="text-[11px] text-zinc-500 mb-0.5 block">{t('bpm')}</label>
                         <input type="number" value={editBpm} onChange={e => setEditBpm(parseInt(e.target.value) || 0)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" />
                       </div>
                       <div>
-                        <label className="text-[11px] text-zinc-500 mb-0.5 block">Key</label>
-                        <input type="text" value={editKey} onChange={e => setEditKey(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" placeholder="e.g. C major" />
+                        <label className="text-[11px] text-zinc-500 mb-0.5 block">{t('key')}</label>
+                        <input type="text" value={editKey} onChange={e => setEditKey(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" placeholder={t('keyPlaceholder')} />
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-[11px] text-zinc-500 mb-0.5 block">Time Sig</label>
+                        <label className="text-[11px] text-zinc-500 mb-0.5 block">{t('timeSig')}</label>
                         <select value={editTimeSig} onChange={e => setEditTimeSig(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50">
                           {TIME_SIGS.map(ts => <option key={ts} value={ts}>{ts || 'Auto'}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[11px] text-zinc-500 mb-0.5 block">Duration</label>
+                        <label className="text-[11px] text-zinc-500 mb-0.5 block">{t('duration')}</label>
                         <input type="number" value={editDuration} readOnly className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-400 opacity-60" />
                       </div>
                       <div>
-                        <label className="text-[11px] text-zinc-500 mb-0.5 block">Language</label>
+                        <label className="text-[11px] text-zinc-500 mb-0.5 block">{t('language')}</label>
                         <select value={editLanguage} onChange={e => setEditLanguage(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50">
                           {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                         </select>
@@ -1016,12 +1016,12 @@ export const TrainingPanel: React.FC = () => {
                 </Section>
 
                 {/* Preprocess to Tensors (matches Gradio's Step 5 with its own Load Existing Dataset) */}
-                <Section title="Preprocess to Tensors">
+                <Section title={t('preprocessToTensors')}>
                   <p className="text-[10px] text-zinc-500 mb-2">{t('preprocessDescription')}</p>
 
                   {/* Load Existing Dataset for Preprocess (Gradio: load_existing_dataset_path/btn/status) */}
                   <div className="mb-3 p-2 bg-white/[0.02] border border-white/5 rounded-lg space-y-2">
-                    <label className="text-[10px] text-zinc-500 font-medium">Load Existing Dataset</label>
+                    <label className="text-[10px] text-zinc-500 font-medium">{t('loadExistingDataset')}</label>
                     <div className="flex gap-2">
                       <input type="text" value={preprocessDatasetPath} onChange={e => setPreprocessDatasetPath(e.target.value)} placeholder="./datasets/my_lora_dataset.json" className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" />
                       <button onClick={handleLoadDatasetForPreprocess} disabled={preprocessDatasetLoading} className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50">
@@ -1119,7 +1119,7 @@ export const TrainingPanel: React.FC = () => {
 
             {/* Loss Chart */}
             {lossChartSvg && (
-              <Section title="Training Loss">
+              <Section title={t('trainingLoss')}>
                 <div className="bg-black/20 rounded-lg p-2">{lossChartSvg}</div>
               </Section>
             )}
@@ -1128,7 +1128,7 @@ export const TrainingPanel: React.FC = () => {
 
         {activeTab === 'export' && (
           <>
-            <Section title="Export LoRA">
+            <Section title={t('exportLora')}>
               <div className="space-y-2">
                 <FieldRow label="Export Path">
                   <input type="text" value={exportPath} onChange={e => setExportPath(e.target.value)} className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-pink-500/50" />
@@ -1144,7 +1144,7 @@ export const TrainingPanel: React.FC = () => {
               {exportStatus && <p className="text-xs text-zinc-400 mt-2 break-words">{exportStatus}</p>}
             </Section>
 
-            <Section title="Load LoRA for Inference">
+            <Section title={t('loadLoraForInference')}>
               <p className="text-xs text-zinc-500 mb-2">
                 After exporting, use the LoRA controls in the Create panel to load your trained adapter.
               </p>

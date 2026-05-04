@@ -243,7 +243,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                             startTitleEdit();
                                         }}
                                         className="text-zinc-400 hover:text-black dark:hover:text-white p-1 mr-1"
-                                        title="Rename song"
+                                        title={t('renameSong')}
                                     >
                                         <Edit3 size={18} />
                                     </button>
@@ -372,7 +372,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                         <div className="space-y-3">
                             <div className="flex items-center gap-2 text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
                                 <LinkIcon size={14} />
-                                Sources
+                                {t('sources')}
                             </div>
                             <div className="space-y-2">
                                 {song.generationParams?.referenceAudioUrl && (
@@ -380,7 +380,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                         <div className="flex items-center gap-2 min-w-0">
                                             <Music size={14} className="text-zinc-400" />
                                             <div className="min-w-0">
-                                                <div className="text-xs text-zinc-500">Reference</div>
+                                                <div className="text-xs text-zinc-500">{t('reference')}</div>
                                                 <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
                                                     {song.generationParams?.referenceAudioTitle || getSourceLabel(song.generationParams?.referenceAudioUrl)}
                                                 </div>
@@ -416,7 +416,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                         <div className="flex items-center gap-2 min-w-0">
                                             <Layers size={14} className="text-zinc-400" />
                                             <div className="min-w-0">
-                                                <div className="text-xs text-zinc-500">Cover</div>
+                                                <div className="text-xs text-zinc-500">{t('cover')}</div>
                                                 <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
                                                     {song.generationParams?.sourceAudioTitle || getSourceLabel(song.generationParams?.sourceAudioUrl)}
                                                 </div>
@@ -527,7 +527,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                         </div>
                         <div className="p-4 max-h-[300px] overflow-y-auto custom-scrollbar">
                             <div className="text-sm text-zinc-700 dark:text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed opacity-90">
-                                {song.lyrics || <div className="text-zinc-400 dark:text-zinc-600 italic text-center py-8">Instrumental<br /><span className="text-xs not-italic">No lyrics generated</span></div>}
+                                {song.lyrics || <div className="text-zinc-400 dark:text-zinc-600 italic text-center py-8">{t('instrumental')}<br /><span className="text-xs not-italic">{t('noLyricsGenerated')}</span></div>}
                             </div>
                         </div>
                     </div>

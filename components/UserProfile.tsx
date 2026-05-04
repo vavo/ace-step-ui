@@ -303,7 +303,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ username, onBack, onPl
                     <button
                         onClick={() => setIsEditModalOpen(true)}
                         className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover/banner:opacity-100 transition-opacity"
-                        title="Edit Banner" // Accessibility
+                        title={t('editBanner')} // Accessibility
                     >
                         <ImageIcon size={20} />
                     </button>

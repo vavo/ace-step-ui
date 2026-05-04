@@ -70,7 +70,7 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
   const validateEmailForm = (): boolean => {
     if (emailMode === 'reset') {
       if (!resetToken.trim()) {
-        setError('Reset token is required.');
+        setError(t('resetTokenRequired'));
         return false;
       }
 
@@ -123,7 +123,7 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
         setNotice(result.resetUrl ? 'Password reset link created.' : 'If this email exists, a reset link has been created.');
       } else if (emailMode === 'reset') {
         if (!resetToken.trim()) {
-          setError('Reset token is required.');
+          setError(t('resetTokenRequired'));
           return;
         }
         await authApi.resetPassword(resetToken.trim(), password);
@@ -248,14 +248,14 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
                 {emailMode === 'reset' && (
                   <div>
                     <label htmlFor="reset-token" className="block text-sm font-medium text-zinc-300 mb-2">
-                      Reset token
+                      {t('resetToken')}
                     </label>
                     <input
                       type="text"
                       id="reset-token"
                       value={resetToken}
                       onChange={(e) => setResetToken(e.target.value)}
-                      placeholder="Paste reset token"
+                      placeholder={t('pasteResetToken')}
                       className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
                       disabled={isLoading}
                     />
@@ -311,7 +311,7 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
                 {emailMode !== 'forgot' && (
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-zinc-300 mb-2">
-                    {emailMode === 'reset' ? 'New password' : t('password')}
+                    {emailMode === 'reset' ? t('newPassword') : t('password')}
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -336,7 +336,7 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
 
                 {resetUrl && (
                   <div className="rounded-xl border border-zinc-700 bg-zinc-950 p-3">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Reset link</div>
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">{t('resetLink')}</div>
                     <div className="break-all text-xs text-zinc-300">{resetUrl}</div>
                     <button
                       type="button"
@@ -344,7 +344,7 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
                       className="mt-3 inline-flex items-center gap-2 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-700"
                     >
                       <Copy size={14} />
-                      Copy link
+                      {t('copyLink')}
                     </button>
                   </div>
                 )}

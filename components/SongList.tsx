@@ -706,7 +706,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
                             onClick={(e) => { e.stopPropagation(); setShareModalOpen(true); }}
-                            title="Share"
+                            title={t('share')}
                         >
                             <Share2 size={16} />
                         </button>
@@ -714,7 +714,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
                             onClick={(e) => { e.stopPropagation(); if (onOpenVideo) onOpenVideo(); }}
-                            title="Create Video"
+                            title={t('createVideo')}
                         >
                             <Video size={16} />
                         </button>
@@ -722,7 +722,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors ml-auto"
                             onClick={(e) => { e.stopPropagation(); onAddToPlaylist(); }}
-                            title="Add to Playlist"
+                            title={t('addToPlaylist')}
                         >
                             <ListPlus size={16} />
                         </button>
@@ -731,7 +731,7 @@ const SongItem: React.FC<SongItemProps> = ({
                         <button
                             className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors xl:hidden"
                             onClick={(e) => { e.stopPropagation(); if (onShowDetails) onShowDetails(); }}
-                            title="Song Details"
+                            title={t('songDetails')}
                         >
                             <Info size={16} />
                         </button>

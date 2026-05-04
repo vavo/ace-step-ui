@@ -134,7 +134,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
             onSaved?.();
         } catch (error) {
             console.error('Failed to update profile:', error);
-            alert('Failed to update profile');
+            alert(t('profileUpdateFailed'));
         } finally {
             setIsSaving(false);
             setUploadingAvatar(false);
