@@ -3,7 +3,7 @@ import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash,
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { creditsApi, generateApi, lyricsApi } from '../services/api';
+import { creditsApi, generateApi, getAudioUrl, lyricsApi } from '../services/api';
 import { MAIN_STYLES } from '../data/genres';
 import { VOCAL_LANGUAGE_KEYS } from '../data/vocalLanguages';
 import { EditableSlider } from './EditableSlider';
@@ -1009,7 +1009,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       setPlayingTrackId(track.id);
       setPlayingTrackSource(track.source);
       if (modalAudioRef.current) {
-        modalAudioRef.current.src = track.audio_url;
+        modalAudioRef.current.src = getAudioUrl(track.audio_url, track.source === 'created' ? track.id : undefined) || track.audio_url;
         modalAudioRef.current.play().catch(() => undefined);
       }
     }
@@ -1243,7 +1243,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         />
         <audio
           ref={referenceAudioRef}
-          src={referenceAudioUrl || undefined}
+          src={getAudioUrl(referenceAudioUrl) || referenceAudioUrl || undefined}
           onPlay={() => setReferencePlaying(true)}
           onPause={() => setReferencePlaying(false)}
           onEnded={() => setReferencePlaying(false)}
@@ -1252,7 +1252,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         />
         <audio
           ref={sourceAudioRef}
-          src={sourceAudioUrl || undefined}
+          src={getAudioUrl(sourceAudioUrl) || sourceAudioUrl || undefined}
           onPlay={() => setSourcePlaying(true)}
           onPause={() => setSourcePlaying(false)}
           onEnded={() => setSourcePlaying(false)}

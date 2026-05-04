@@ -21,6 +21,7 @@ function getAudioDuration(filePath: string): number {
 import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
 import { getGradioClient, resetGradioClient, isAceStepApiAvailable, isGradioAvailable } from './gradio-client.js';
+import { transcodeToWav } from './audioTranscode.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +79,11 @@ function getAudioExtension(filePath: string): '.mp3' | '.flac' | '.wav' | '' {
   return '';
 }
 
+function shouldConvertForAceStep(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return Boolean(ext && ext !== '.wav' && ext !== '.flac');
+}
+
 function resolveRequestedDuration(params: Pick<GenerationParams, 'duration'>): number {
   return params.duration && params.duration > 0 ? params.duration : DEFAULT_AUTO_DURATION_SECONDS;
 }
@@ -91,16 +97,27 @@ function resolveRequestedDuration(params: Pick<GenerationParams, 'duration'>): n
  */
 function resolveAudioPath(audioUrl: string): string {
   if (audioUrl.startsWith('/audio/')) {
-    return path.join(AUDIO_DIR, audioUrl.replace('/audio/', ''));
+    return path.resolve(AUDIO_DIR, audioUrl.replace('/audio/', ''));
   }
   if (audioUrl.startsWith('http')) {
     try {
       const parsed = new URL(audioUrl);
       if (parsed.pathname.startsWith('/audio/')) {
-        return path.join(AUDIO_DIR, parsed.pathname.replace('/audio/', ''));
+        return path.resolve(AUDIO_DIR, parsed.pathname.replace('/audio/', ''));
       }
     } catch { /* fall through */ }
   }
+
+  const normalized = audioUrl.replace(/\\/g, '/');
+  const publicAudioIndex = normalized.indexOf('public/audio/');
+  if (publicAudioIndex >= 0) {
+    return path.resolve(AUDIO_DIR, normalized.slice(publicAudioIndex + 'public/audio/'.length));
+  }
+
+  if (!path.isAbsolute(audioUrl)) {
+    return path.resolve(audioUrl);
+  }
+
   return audioUrl;
 }
 
@@ -114,8 +131,12 @@ async function prepareAudioFile(audioUrl: string | undefined): Promise<unknown> 
   const filePath = resolveAudioPath(audioUrl);
 
   try {
-    const buffer = await readFile(filePath);
-    const ext = path.extname(filePath).toLowerCase();
+    let buffer = await readFile(filePath);
+    let ext = path.extname(filePath).toLowerCase();
+    if (shouldConvertForAceStep(filePath)) {
+      buffer = await transcodeToWav(buffer);
+      ext = '.wav';
+    }
     const mimeMap: Record<string, string> = {
       '.flac': 'audio/flac', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
       '.opus': 'audio/opus', '.m4a': 'audio/mp4', '.mp4': 'audio/mp4',
@@ -131,6 +152,19 @@ async function prepareAudioFile(audioUrl: string | undefined): Promise<unknown> 
     }
     return null;
   }
+}
+
+async function preparePythonAudioPath(audioUrl: string, jobOutputDir: string, label: string): Promise<string> {
+  const filePath = resolveAudioPath(audioUrl);
+  if (!shouldConvertForAceStep(filePath)) {
+    return filePath;
+  }
+
+  const buffer = await readFile(filePath);
+  const wav = await transcodeToWav(buffer);
+  const convertedPath = path.join(jobOutputDir, `${label}.wav`);
+  await writeFile(convertedPath, wav);
+  return convertedPath;
 }
 
 /**
@@ -696,10 +730,10 @@ async function processGenerationViaPython(
     if (resolvedTaskType && resolvedTaskType !== 'text2music') args.push('--task-type', resolvedTaskType);
 
     if (params.referenceAudioUrl) {
-      args.push('--reference-audio', resolveAudioPath(params.referenceAudioUrl));
+      args.push('--reference-audio', await preparePythonAudioPath(params.referenceAudioUrl, jobOutputDir, 'reference_audio'));
     }
     if (params.sourceAudioUrl) {
-      args.push('--src-audio', resolveAudioPath(params.sourceAudioUrl));
+      args.push('--src-audio', await preparePythonAudioPath(params.sourceAudioUrl, jobOutputDir, 'source_audio'));
     }
     if (params.audioCodes) args.push('--audio-codes', params.audioCodes);
     if (params.repaintingStart !== undefined && params.repaintingStart > 0) args.push('--repainting-start', String(params.repaintingStart));

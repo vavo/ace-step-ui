@@ -6,7 +6,7 @@ import { useI18n } from '../context/I18nContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
 import { AlbumCover } from './AlbumCover';
-import { songsApi } from '../services/api';
+import { getAudioUrl, songsApi } from '../services/api';
 
 interface SongListProps {
     songs: Song[];
@@ -790,6 +790,7 @@ const UploadItem: React.FC<{
     onCoverSong?: () => void;
 }> = ({ track, onPlay, onUseAsReference, onCoverSong }) => {
     const title = track.filename.replace(/\.[^/.]+$/, '');
+    const playableUrl = getAudioUrl(track.audio_url) || track.audio_url;
     const duration = track.duration
         ? `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, '0')}`
         : '--:--';
@@ -804,7 +805,7 @@ const UploadItem: React.FC<{
                 duration,
                 createdAt: new Date(),
                 tags: [],
-                audioUrl: track.audio_url,
+                audioUrl: playableUrl,
                 isPublic: false,
             } as Song}
             isCurrent={false}
@@ -814,8 +815,8 @@ const UploadItem: React.FC<{
             isLiked={false}
             isPlaying={false}
             isOwner={false}
-            onPlay={() => onPlay(track.audio_url, title)}
-            onSelect={() => onPlay(track.audio_url, title)}
+            onPlay={() => onPlay(playableUrl, title)}
+            onSelect={() => onPlay(playableUrl, title)}
             onToggleSelect={() => undefined}
             onToggleLike={() => undefined}
             onAddToPlaylist={() => undefined}

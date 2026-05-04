@@ -4,6 +4,12 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '../../..');
+
+function resolveProjectPath(value: string | undefined, fallback: string): string {
+  const resolved = value || fallback;
+  return path.isAbsolute(resolved) ? resolved : path.resolve(projectRoot, resolved);
+}
 
 // Load the canonical root env even when the server is started with
 // `npm --prefix server start`, where process.cwd() is the server directory.
@@ -69,7 +75,7 @@ export const config = {
   // Storage (local only)
   storage: {
     provider: 'local' as const,
-    audioDir: process.env.AUDIO_DIR || path.join(__dirname, '../../public/audio'),
+    audioDir: resolveProjectPath(process.env.AUDIO_DIR, 'public/audio'),
   },
 
   // Training datasets (inside ACE-Step-1.5 so Gradio can access them)

@@ -1,4 +1,4 @@
-export type Language = 'en' | 'zh' | 'ja' | 'ko' | 'sk';
+export type Language = 'en' | 'sk';
 
 type TranslationBundle = Record<string, string>;
 

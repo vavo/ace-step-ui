@@ -1,13 +1,35 @@
 import { Router, Response } from 'express';
 import { Readable } from 'node:stream';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/pool.js';
 import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
 import { recordComment, recordPublishedSong, recordSongLike, recordSongPlay } from '../services/gamification.js';
 import { checkRateLimit } from '../services/rateLimit.js';
+import { config } from '../config/index.js';
+import { transcodeToMp3 } from '../services/audioTranscode.js';
 
 const router = Router();
+
+function isFlacAudio(value: string | null): boolean {
+  return Boolean(value && /\.flac(?:$|\?)/i.test(value));
+}
+
+function localAudioPath(audioUrl: string): string | null {
+  if (!audioUrl.startsWith('/audio/')) return null;
+  const cleanKey = audioUrl.slice('/audio/'.length).replace(/^\/+/, '');
+  return path.join(config.storage.audioDir, cleanKey);
+}
+
+async function sendMp3Fallback(res: Response, input: Buffer): Promise<void> {
+  const mp3 = await transcodeToMp3(input);
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Content-Length', String(mp3.length));
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(mp3);
+}
 
 // Helper: resolve audio URL (generates signed URL for S3)
 async function resolveAudioUrl(audioUrl: string | null): Promise<string | null> {
@@ -59,8 +81,25 @@ router.get('/:id/audio', optionalAuthMiddleware, async (req: AuthenticatedReques
       return;
     }
 
-    // Local files - redirect
+    // Local files: redirect browser-safe formats, transcode FLAC for Safari/WebKit.
     if (audioUrl.startsWith('/')) {
+      if (isFlacAudio(audioUrl)) {
+        const filePath = localAudioPath(audioUrl);
+        if (!filePath) {
+          res.status(404).json({ error: 'Audio not available' });
+          return;
+        }
+
+        try {
+          const buffer = await readFile(filePath);
+          await sendMp3Fallback(res, buffer);
+        } catch (error) {
+          console.error('FLAC playback transcode failed:', error);
+          res.status(415).json({ error: 'Audio format is not supported and MP3 fallback failed' });
+        }
+        return;
+      }
+
       res.redirect(audioUrl);
       return;
     }
@@ -76,6 +115,18 @@ router.get('/:id/audio', optionalAuthMiddleware, async (req: AuthenticatedReques
     }
 
     const contentType = audioRes.headers.get('content-type') || 'audio/mpeg';
+
+    if (isFlacAudio(audioUrl) || contentType.includes('flac')) {
+      try {
+        const arrayBuffer = await audioRes.arrayBuffer();
+        await sendMp3Fallback(res, Buffer.from(arrayBuffer));
+      } catch (error) {
+        console.error('Remote FLAC playback transcode failed:', error);
+        res.status(415).json({ error: 'Audio format is not supported and MP3 fallback failed' });
+      }
+      return;
+    }
+
     res.setHeader('Content-Type', contentType);
     res.setHeader('Accept-Ranges', 'bytes');
 

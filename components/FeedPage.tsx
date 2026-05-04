@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Ban, Heart, Loader2, MessageCircle, MoreHorizontal, Music2, Play, RefreshCw, UserRound } from 'lucide-react';
 import { Song } from '../types';
-import { socialApi, Song as ApiSong } from '../services/api';
+import { getAudioUrl, socialApi, Song as ApiSong } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
 import { EmptyState } from './EmptyState';
@@ -34,7 +34,7 @@ function toSong(song: ApiSong): FeedSong {
     duration: song.duration ? `${Math.floor(Number(song.duration) / 60)}:${String(Math.floor(Number(song.duration) % 60)).padStart(2, '0')}` : '0:00',
     createdAt: new Date(song.created_at),
     tags: song.tags || [],
-    audioUrl: song.audio_url || song.audioUrl,
+    audioUrl: getAudioUrl(song.audio_url || song.audioUrl, song.id),
     isPublic: song.is_public,
     likeCount: song.like_count || 0,
     viewCount: song.view_count || 0,

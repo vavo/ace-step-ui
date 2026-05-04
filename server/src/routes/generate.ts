@@ -28,6 +28,7 @@ import {
   reserveCredits,
 } from '../services/credits.js';
 import { recordPublishedSong } from '../services/gamification.js';
+import { transcodeToMp3 } from '../services/audioTranscode.js';
 
 const router = Router();
 
@@ -1263,9 +1264,21 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
 
               try {
                 const { buffer } = await downloadAudioToBuffer(audioUrl);
-                const ext = audioUrl.includes('.wav') ? '.wav' : audioUrl.includes('.flac') ? '.flac' : '.mp3';
+                const sourceExt = audioUrl.includes('.wav') ? '.wav' : audioUrl.includes('.flac') ? '.flac' : '.mp3';
+                let outputBuffer = buffer;
+                let ext = sourceExt;
+
+                if (sourceExt === '.flac') {
+                  try {
+                    outputBuffer = await transcodeToMp3(buffer);
+                    ext = '.mp3';
+                  } catch (transcodeError) {
+                    console.error(`Failed to transcode generated FLAC ${i + 1} to MP3, storing original:`, transcodeError);
+                  }
+                }
+
                 const storageKey = `${req.user!.id}/${songId}${ext}`;
-                await storage.upload(storageKey, buffer, `audio/${ext.slice(1)}`);
+                await storage.upload(storageKey, outputBuffer, ext === '.mp3' ? 'audio/mpeg' : `audio/${ext.slice(1)}`);
                 const storedPath = storage.getPublicUrl(storageKey);
 
                 await pool.query(
@@ -1376,6 +1389,24 @@ router.get('/audio', async (req, res: Response) => {
     }
 
     const contentType = audioResponse.headers.get('content-type');
+    const wantsMp3 = req.query.format === 'mp3';
+    const isFlac = /\.flac(?:$|\?)/i.test(audioPath) || Boolean(contentType?.includes('flac'));
+
+    if (wantsMp3 || isFlac) {
+      try {
+        const arrayBuffer = await audioResponse.arrayBuffer();
+        const mp3 = await transcodeToMp3(Buffer.from(arrayBuffer));
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', String(mp3.length));
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.send(mp3);
+      } catch (error) {
+        console.error('Audio MP3 fallback failed:', error);
+        res.status(415).json({ error: 'Audio format is not supported and MP3 fallback failed' });
+      }
+      return;
+    }
+
     if (contentType) {
       res.setHeader('Content-Type', contentType);
     }

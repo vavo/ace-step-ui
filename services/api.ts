@@ -5,6 +5,18 @@ const API_BASE = '';
 export function getAudioUrl(audioUrl: string | undefined | null, songId?: string): string | undefined {
   if (!audioUrl) return undefined;
 
+  // Route song playback through the backend so auth, range handling, and
+  // browser-safe codec fallback are centralized.
+  if (songId) {
+    return `/api/songs/${encodeURIComponent(songId)}/audio`;
+  }
+
+  // Local FLAC files are not playable in Safari/WebKit. Use the audio proxy so
+  // the server can return an MP3 stream when needed.
+  if (/\.flac(?:$|\?)/i.test(audioUrl) && audioUrl.startsWith('/audio/')) {
+    return `/api/generate/audio?path=${encodeURIComponent(audioUrl)}&format=mp3`;
+  }
+
   // Local storage: already relative, works with proxy
   if (audioUrl.startsWith('/audio/')) {
     return audioUrl;
