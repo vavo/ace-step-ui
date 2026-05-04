@@ -236,6 +236,57 @@ Top-p: ${input.topP || 'N/A'}
 `.trim();
 }
 
+function normalizeIntentText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function includesAny(text: string, patterns: RegExp[]): boolean {
+  return patterns.some(pattern => pattern.test(text));
+}
+
+function preserveExplicitFormatIntent(input: GeminiFormatInput, result: GeminiFormatResult): GeminiFormatResult {
+  const source = normalizeIntentText(`${input.caption}\n${input.lyrics || ''}`);
+  const currentCaption = result.caption || input.caption;
+  const captionCheck = normalizeIntentText(currentCaption);
+  const requiredPhrases: string[] = [];
+
+  const wantsJungle = includesAny(source, [/\bjungle\b/, /\bdnb\b/, /drum\s*(and|&)\s*bass/]);
+  const wantsSlovak = includesAny(source, [/slovak/, /slovenc/, /slovencin/, /slovencine/, /slovensky/]);
+  const wantsFemaleVocal = includesAny(source, [/female\s+vocal/, /female\s+voice/, /woman\s+vocal/, /women\s+vocal/, /zensky/, /zenskym/, /zena/, /vokalom/]);
+  const explicitlyInstrumental = includesAny(source, [/\binstrumental\b/, /bez\s+vokal/, /bez\s+spevu/, /no\s+vocal/]);
+
+  if (wantsJungle && !includesAny(captionCheck, [/\bjungle\b/, /drum\s*(and|&)\s*bass/, /\bdnb\b/])) {
+    requiredPhrases.push('jungle / drum and bass groove');
+  }
+
+  if (wantsSlovak && !includesAny(captionCheck, [/slovak/, /slovenc/, /slovencin/])) {
+    requiredPhrases.push('Slovak language vocals');
+  }
+
+  if (wantsFemaleVocal && !includesAny(captionCheck, [/female\s+vocal/, /female\s+voice/, /woman\s+vocal/, /women\s+vocal/, /zensky/, /zensk/])) {
+    requiredPhrases.push('strong female lead vocal');
+  }
+
+  let caption = currentCaption;
+  if (!explicitlyInstrumental && (wantsFemaleVocal || wantsSlovak) && /\binstrumental\b/i.test(caption)) {
+    caption = caption.replace(/\binstrumental\s+(track|piece|song)\b/gi, 'vocal song');
+    caption = caption.replace(/\binstrumental\b/gi, 'vocal');
+  }
+
+  if (requiredPhrases.length > 0) {
+    caption = `${requiredPhrases.join(', ')}. ${caption}`;
+  }
+
+  return {
+    ...result,
+    caption,
+    vocal_language: wantsSlovak ? 'sk' : result.vocal_language,
+  };
+}
+
 async function formatWithOpenAI(input: GeminiFormatInput): Promise<GeminiFormatResult | null> {
   const apiKey = config.openai.apiKey;
   if (!apiKey) return null;
@@ -1286,7 +1337,17 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
         });
 
         if (fallbackResult && (fallbackResult.caption || fallbackResult.lyrics)) {
-          res.json(fallbackResult);
+          res.json(preserveExplicitFormatIntent({
+            caption,
+            lyrics: lyrics || undefined,
+            bpm: bpm,
+            duration: duration,
+            keyScale: keyScale || undefined,
+            timeSignature: timeSignature || undefined,
+            temperature: temperature,
+            topK: topK,
+            topP: topP,
+          }, fallbackResult));
           return;
         }
 
@@ -1305,7 +1366,17 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
       }
 
       const d = apiData.data;
-      res.json({
+      res.json(preserveExplicitFormatIntent({
+        caption,
+        lyrics: lyrics || undefined,
+        bpm: bpm,
+        duration: duration,
+        keyScale: keyScale || undefined,
+        timeSignature: timeSignature || undefined,
+        temperature: temperature,
+        topK: topK,
+        topP: topP,
+      }, {
         caption: d.caption,
         lyrics: d.lyrics,
         bpm: d.bpm,
@@ -1313,7 +1384,7 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
         key_scale: d.key_scale,
         time_signature: d.time_signature,
         vocal_language: d.vocal_language,
-      });
+      }));
       return;
     } catch (fetchErr: any) {
       const fallbackResult = await formatWithConfiguredProvider({
@@ -1329,7 +1400,17 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
       });
 
       if (fallbackResult && (fallbackResult.caption || fallbackResult.lyrics)) {
-        res.json(fallbackResult);
+        res.json(preserveExplicitFormatIntent({
+          caption,
+          lyrics: lyrics || undefined,
+          bpm: bpm,
+          duration: duration,
+          keyScale: keyScale || undefined,
+          timeSignature: timeSignature || undefined,
+          temperature: temperature,
+          topK: topK,
+          topP: topP,
+        }, fallbackResult));
         return;
       }
 
@@ -1406,7 +1487,17 @@ router.post('/format', authMiddleware, async (req: AuthenticatedRequest, res: Re
     });
 
     if (result.success && result.data) {
-      res.json(result.data);
+      res.json(preserveExplicitFormatIntent({
+        caption,
+        lyrics: lyrics || undefined,
+        bpm: bpm,
+        duration: duration,
+        keyScale: keyScale || undefined,
+        timeSignature: timeSignature || undefined,
+        temperature: temperature,
+        topK: topK,
+        topP: topP,
+      }, result.data));
     } else {
       console.error('[Format] Python error:', result.error);
       res.status(500).json({ success: false, error: result.error });

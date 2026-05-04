@@ -17,6 +17,7 @@ import { Toast, ToastType } from './components/Toast';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { BadgeAwardModal } from './components/BadgeAwardModal';
+import { InsufficientCreditsModal } from './components/InsufficientCreditsModal';
 
 const FeedPage = lazy(() => import('./components/FeedPage').then((module) => ({ default: module.FeedPage })));
 const IdeasPage = lazy(() => import('./components/IdeasPage').then((module) => ({ default: module.IdeasPage })));
@@ -97,6 +98,7 @@ function AppContent() {
 
   // Settings Modal
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showInsufficientCreditsModal, setShowInsufficientCreditsModal] = useState(false);
 
   // Profile View
   const [viewingUsername, setViewingUsername] = useState<string | null>(null);
@@ -977,11 +979,21 @@ function AppContent() {
     } catch (e) {
       console.error('Generation error:', e);
       setSongs(prev => prev.filter(s => s.id !== tempId));
+      if (selectedSongRef.current?.id === tempId) {
+        setSelectedSong(null);
+      }
 
       // Only set isGenerating to false if no other jobs are running
       if (activeJobsRef.current.size === 0) {
         setIsGenerating(false);
       }
+
+      const message = e instanceof Error ? e.message : '';
+      if (message.startsWith('402:') || /insufficient credits/i.test(message)) {
+        setShowInsufficientCreditsModal(true);
+        return;
+      }
+
       showToast(t('generationFailed'), 'error');
     }
   };
@@ -1679,6 +1691,14 @@ function AppContent() {
       <BadgeAwardModal
         badge={badgeQueue[0] || null}
         onClose={() => setBadgeQueue(prev => prev.slice(1))}
+      />
+      <InsufficientCreditsModal
+        isOpen={showInsufficientCreditsModal}
+        onClose={() => setShowInsufficientCreditsModal(false)}
+        onSubscribe={() => {
+          setShowInsufficientCreditsModal(false);
+          setShowSettingsModal(true);
+        }}
       />
     </div>
   );

@@ -62,6 +62,7 @@ export const config = {
     googleCallbackUrl: process.env.GOOGLE_OAUTH_CALLBACK_URL || '',
     sessionDays: parseInt(process.env.AUTH_SESSION_DAYS || '30', 10),
     superadminEmail: (process.env.SUPERADMIN_EMAIL || '').trim().toLowerCase(),
+    passwordResetBaseUrl: process.env.PASSWORD_RESET_BASE_URL || process.env.FRONTEND_URL || `http://localhost:${defaultPort}`,
   },
 
   // Storage (local only)

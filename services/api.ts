@@ -165,6 +165,12 @@ export const authApi = {
   emailLogin: (email: string, password: string): Promise<AuthResponse> =>
     api('/api/auth/email/login', { method: 'POST', body: { email, password } }),
 
+  forgotPassword: (email: string): Promise<{ sent: boolean; resetUrl?: string }> =>
+    api('/api/auth/password/forgot', { method: 'POST', body: { email } }),
+
+  resetPassword: (token: string, password: string): Promise<{ success: boolean }> =>
+    api('/api/auth/password/reset', { method: 'POST', body: { token, password } }),
+
   me: (token?: string | null): Promise<AuthResponse> =>
     api('/api/auth/me', { token: token || undefined }),
 

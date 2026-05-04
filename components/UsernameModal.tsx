@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Lock, Mail, Sparkles, User } from 'lucide-react';
+import { Copy, Lock, Mail, Sparkles, User } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
 import { authApi, AuthOptions } from '../services/api';
 
@@ -11,7 +11,7 @@ interface UsernameModalProps {
   onGoogleLogin?: () => void;
 }
 
-type EmailMode = 'login' | 'register';
+type EmailMode = 'login' | 'register' | 'forgot' | 'reset';
 
 export const UsernameModal: React.FC<UsernameModalProps> = ({
   isOpen,
@@ -25,6 +25,9 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
   const [emailUsername, setEmailUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [resetUrl, setResetUrl] = useState('');
+  const [notice, setNotice] = useState('');
   const [emailMode, setEmailMode] = useState<EmailMode>('login');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,6 +48,19 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
     };
   }, [isOpen, onGoogleLogin]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('resetToken');
+    if (!token) return;
+
+    setResetToken(token);
+    setEmailMode('reset');
+    setError('');
+    setNotice('');
+    window.history.replaceState({}, '', window.location.pathname);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const googleConfigured = authOptions?.googleConfigured ?? Boolean(onGoogleLogin);
@@ -52,10 +68,26 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
   const emailAuthAllowed = authOptions?.emailAuthAllowed ?? true;
 
   const validateEmailForm = (): boolean => {
+    if (emailMode === 'reset') {
+      if (!resetToken.trim()) {
+        setError('Reset token is required.');
+        return false;
+      }
+
+      if (password.length < 8) {
+        setError(t('passwordMinLength'));
+        return false;
+      }
+
+      return true;
+    }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setError(t('invalidEmail'));
       return false;
     }
+
+    if (emailMode === 'forgot') return true;
 
     if (password.length < 8) {
       setError(t('passwordMinLength'));
@@ -85,7 +117,21 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
 
     setIsLoading(true);
     try {
-      if (emailMode === 'register') {
+      if (emailMode === 'forgot') {
+        const result = await authApi.forgotPassword(email.trim());
+        setResetUrl(result.resetUrl || '');
+        setNotice(result.resetUrl ? 'Password reset link created.' : 'If this email exists, a reset link has been created.');
+      } else if (emailMode === 'reset') {
+        if (!resetToken.trim()) {
+          setError('Reset token is required.');
+          return;
+        }
+        await authApi.resetPassword(resetToken.trim(), password);
+        setPassword('');
+        setResetToken('');
+        setEmailMode('login');
+        setNotice('Password updated. Sign in with your new password.');
+      } else if (emailMode === 'register') {
         await onEmailRegister(email.trim(), password, emailUsername.trim());
       } else {
         await onEmailLogin(email.trim(), password);
@@ -193,6 +239,29 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
                   </button>
                 </div>
 
+                {emailMode === 'forgot' && (
+                  <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-100">
+                    Enter your account email. On this self-hosted build, the reset link is shown here after creation.
+                  </div>
+                )}
+
+                {emailMode === 'reset' && (
+                  <div>
+                    <label htmlFor="reset-token" className="block text-sm font-medium text-zinc-300 mb-2">
+                      Reset token
+                    </label>
+                    <input
+                      type="text"
+                      id="reset-token"
+                      value={resetToken}
+                      onChange={(e) => setResetToken(e.target.value)}
+                      placeholder="Paste reset token"
+                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                      disabled={isLoading}
+                    />
+                  </div>
+                )}
+
                 {emailMode === 'register' && (
                   <div>
                     <label htmlFor="email-username" className="block text-sm font-medium text-zinc-300 mb-2">
@@ -216,6 +285,7 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
                   </div>
                 )}
 
+                {emailMode !== 'reset' && (
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-zinc-300 mb-2">
                     {t('emailAddress')}
@@ -236,10 +306,12 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
                     />
                   </div>
                 </div>
+                )}
 
+                {emailMode !== 'forgot' && (
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-zinc-300 mb-2">
-                    {t('password')}
+                    {emailMode === 'reset' ? 'New password' : t('password')}
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -256,6 +328,26 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
                     />
                   </div>
                 </div>
+                )}
+
+                {notice && (
+                  <p className="text-sm text-green-400">{notice}</p>
+                )}
+
+                {resetUrl && (
+                  <div className="rounded-xl border border-zinc-700 bg-zinc-950 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Reset link</div>
+                    <div className="break-all text-xs text-zinc-300">{resetUrl}</div>
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(resetUrl).catch(() => {})}
+                      className="mt-3 inline-flex items-center gap-2 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-700"
+                    >
+                      <Copy size={14} />
+                      Copy link
+                    </button>
+                  </div>
+                )}
 
                 {error && (
                   <p className="text-sm text-red-400">{error}</p>
@@ -263,11 +355,56 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({
 
                 <button
                   type="submit"
-                  disabled={isLoading || !email.trim() || !password || (emailMode === 'register' && !emailUsername.trim())}
+                  disabled={
+                    isLoading
+                    || (emailMode !== 'reset' && !email.trim())
+                    || (emailMode !== 'forgot' && !password)
+                    || (emailMode === 'register' && !emailUsername.trim())
+                    || (emailMode === 'reset' && !resetToken.trim())
+                  }
                   className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold rounded-xl hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  {isLoading ? t('gettingStarted') : emailMode === 'register' ? t('createAccountWithEmail') : t('signInWithEmail')}
+                  {isLoading
+                    ? t('gettingStarted')
+                    : emailMode === 'register'
+                      ? t('createAccountWithEmail')
+                      : emailMode === 'forgot'
+                        ? 'Create reset link'
+                        : emailMode === 'reset'
+                          ? 'Set new password'
+                          : t('signInWithEmail')}
                 </button>
+
+                <div className="flex justify-center gap-3 text-xs">
+                  {emailMode === 'login' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailMode('forgot');
+                        setError('');
+                        setNotice('');
+                        setResetUrl('');
+                      }}
+                      className="text-zinc-400 hover:text-white"
+                    >
+                      Forgot password?
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailMode('login');
+                        setError('');
+                        setNotice('');
+                        setResetUrl('');
+                        setResetToken('');
+                      }}
+                      className="text-zinc-400 hover:text-white"
+                    >
+                      Back to sign in
+                    </button>
+                  )}
+                </div>
               </form>
             )}
 

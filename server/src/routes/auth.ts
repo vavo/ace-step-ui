@@ -1,4 +1,4 @@
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/pool.js';
@@ -35,6 +35,15 @@ interface EmailLoginBody {
   password: string;
 }
 
+interface ForgotPasswordBody {
+  email: string;
+}
+
+interface ResetPasswordBody {
+  token: string;
+  password: string;
+}
+
 type GoogleTokenResponse = {
   access_token?: string;
   error?: string;
@@ -58,6 +67,10 @@ function getPublicApiUrl(): string {
 
 function getGoogleCallbackUrl(): string {
   return config.auth.googleCallbackUrl || `${getPublicApiUrl()}/api/auth/google/callback`;
+}
+
+function getPasswordResetBaseUrl(): string {
+  return config.auth.passwordResetBaseUrl.replace(/\/$/, '');
 }
 
 function googleConfigured(): boolean {
@@ -122,6 +135,14 @@ async function verifyPassword(password: string, storedHash: unknown): Promise<bo
   const expected = Buffer.from(encodedHash, 'base64url');
   const actual = await scrypt(password, salt, expected.length) as Buffer;
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('base64url');
+}
+
+function buildResetUrl(token: string): string {
+  return `${getPasswordResetBaseUrl()}/?resetToken=${encodeURIComponent(token)}`;
 }
 
 async function upsertGoogleUser(profile: GoogleProfile) {
@@ -373,6 +394,104 @@ router.post('/email/login', async (req: Request<object, object, Partial<EmailLog
   } catch (error) {
     console.error('Email login error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/password/forgot', async (req: Request<object, object, Partial<ForgotPasswordBody>>, res: Response) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const genericResponse: { sent: boolean; resetUrl?: string } = { sent: true };
+
+    if (!isValidEmail(email)) {
+      res.json(genericResponse);
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT id, password_hash FROM users WHERE email = ?`,
+      [email]
+    );
+    const user = result.rows[0];
+
+    if (!user?.id || !user.password_hash) {
+      res.json(genericResponse);
+      return;
+    }
+
+    await pool.query(
+      `UPDATE password_reset_tokens
+       SET used_at = datetime('now')
+       WHERE user_id = ? AND used_at IS NULL`,
+      [user.id]
+    );
+
+    const token = randomBytes(32).toString('base64url');
+    const tokenHash = hashResetToken(token);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    await pool.query(
+      `INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, created_at)
+       VALUES (?, ?, ?, ?, datetime('now'))`,
+      [generateUUID(), user.id, tokenHash, expiresAt]
+    );
+
+    res.json({
+      sent: true,
+      resetUrl: buildResetUrl(token),
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Failed to create password reset' });
+  }
+});
+
+router.post('/password/reset', async (req: Request<object, object, Partial<ResetPasswordBody>>, res: Response) => {
+  try {
+    const token = typeof req.body.token === 'string' ? req.body.token.trim() : '';
+    const password = req.body.password;
+
+    if (!token || !isValidPassword(password)) {
+      res.status(400).json({ error: 'Invalid or expired reset link' });
+      return;
+    }
+
+    const tokenHash = hashResetToken(token);
+    const result = await pool.query(
+      `SELECT prt.id, prt.user_id
+       FROM password_reset_tokens prt
+       INNER JOIN users u ON u.id = prt.user_id
+       WHERE prt.token_hash = ?
+         AND prt.used_at IS NULL
+         AND prt.expires_at > ?
+         AND u.password_hash IS NOT NULL
+       LIMIT 1`,
+      [tokenHash, new Date().toISOString()]
+    );
+    const reset = result.rows[0];
+
+    if (!reset) {
+      res.status(400).json({ error: 'Invalid or expired reset link' });
+      return;
+    }
+
+    const passwordHash = await hashPassword(password);
+    await pool.query(
+      `UPDATE users
+       SET password_hash = ?, auth_provider = CASE WHEN auth_provider = 'local' THEN 'email' ELSE auth_provider END, updated_at = datetime('now')
+       WHERE id = ?`,
+      [passwordHash, reset.user_id]
+    );
+    await pool.query(
+      `UPDATE password_reset_tokens
+       SET used_at = datetime('now')
+       WHERE user_id = ? AND used_at IS NULL`,
+      [reset.user_id]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 
