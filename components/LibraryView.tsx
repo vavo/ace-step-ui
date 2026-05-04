@@ -13,6 +13,7 @@ interface LibraryViewProps {
   likedSongs: Song[];
   playlists: Playlist[];
   referenceTracks: ReferenceTrack[];
+  referenceUploadUsage?: UploadUsage | null;
   onPlaySong: (song: Song, list?: Song[]) => void;
   onCreatePlaylist: () => void;
   onSelectPlaylist: (playlist: Playlist) => void;
@@ -36,11 +37,18 @@ interface ReferenceTrack {
     audio_url: string;
 }
 
+interface UploadUsage {
+    usedBytes: number;
+    limitBytes: number | null;
+    plan: string;
+}
+
 export const LibraryView: React.FC<LibraryViewProps> = ({ 
     allSongs,
     likedSongs, 
     playlists, 
     referenceTracks,
+    referenceUploadUsage,
     onPlaySong, 
     onCreatePlaylist,
     onSelectPlaylist,
@@ -58,6 +66,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [shareSong, setShareSong] = useState<Song | null>(null);
     const uploadInputRef = useRef<HTMLInputElement | null>(null);
+    const fallbackUsedBytes = referenceTracks.reduce((total, track) => total + (track.file_size_bytes || 0), 0);
+    const usedBytes = referenceUploadUsage?.usedBytes ?? fallbackUsedBytes;
+    const limitBytes = referenceUploadUsage?.limitBytes ?? null;
+    const isUploadLimitReached = limitBytes !== null && usedBytes >= limitBytes;
 
     const formatBytes = (bytes?: number | null) => {
         if (!bytes || bytes <= 0) return '0 B';
@@ -71,8 +83,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
     };
 
+    const formatMbNumber = (bytes: number) => {
+        const mb = bytes / (1024 * 1024);
+        return mb >= 10 || Number.isInteger(mb) ? mb.toFixed(0) : mb.toFixed(1);
+    };
+
     const openUploadPicker = () => {
-        if (isUploadingReferenceTrack) return;
+        if (isUploadingReferenceTrack || isUploadLimitReached) return;
         uploadInputRef.current?.click();
     };
 
@@ -293,6 +310,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         <div className="min-w-0">
                             <div className="text-sm font-semibold text-zinc-900 dark:text-white">{t('uploadAudio')}</div>
                             <div className="text-xs text-zinc-500 dark:text-zinc-400">{t('uploadAudioFilesAsReferences')} · {t('audioFormats')}</div>
+                            {limitBytes !== null && (
+                                <div className="mt-2 max-w-xs">
+                                    <div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                                        <span>{formatMbNumber(usedBytes)} / {formatMbNumber(limitBytes)} MBs</span>
+                                    </div>
+                                    <div className="h-1.5 rounded-full bg-zinc-200 dark:bg-white/10 overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full ${isUploadLimitReached ? 'bg-rose-500' : 'bg-green-500'}`}
+                                            style={{ width: `${Math.min(100, (usedBytes / limitBytes) * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <input
                             ref={uploadInputRef}
@@ -304,7 +334,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         <button
                             type="button"
                             onClick={openUploadPicker}
-                            disabled={!onUploadReferenceTrack || isUploadingReferenceTrack}
+                            disabled={!onUploadReferenceTrack || isUploadingReferenceTrack || isUploadLimitReached}
                             className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-900 dark:bg-white px-4 py-2 text-sm font-semibold text-white dark:text-zinc-950 transition-colors hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {isUploadingReferenceTrack ? (

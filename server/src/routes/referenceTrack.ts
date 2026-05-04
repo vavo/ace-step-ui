@@ -11,6 +11,36 @@ import { config } from '../config/index.js';
 import { spawn } from 'child_process';
 
 const router = Router();
+const FREE_UPLOAD_LIMIT_BYTES = 50 * 1024 * 1024;
+
+type UploadUsage = {
+  usedBytes: number;
+  limitBytes: number | null;
+  plan: string;
+};
+
+async function getUploadUsage(userId: string): Promise<UploadUsage> {
+  const result = await pool.query(
+    `SELECT
+       COALESCE(SUM(rt.file_size_bytes), 0) as used_bytes,
+       COALESCE(u.plan, 'free') as plan
+     FROM users u
+     LEFT JOIN reference_tracks rt ON rt.user_id = u.id
+     WHERE u.id = $1
+     GROUP BY u.id, u.plan`,
+    [userId]
+  );
+
+  const row = result.rows[0];
+  const plan = String(row?.plan || 'free');
+  const usedBytes = Number(row?.used_bytes || 0);
+
+  return {
+    usedBytes,
+    limitBytes: plan === 'free' ? FREE_UPLOAD_LIMIT_BYTES : null,
+    plan,
+  };
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -140,7 +170,10 @@ router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response)
       audio_url: storage.getPublicUrl(row.storage_key)
     }));
 
-    res.json({ tracks });
+    res.json({
+      tracks,
+      uploadUsage: await getUploadUsage(req.user!.id),
+    });
   } catch (error) {
     console.error('Get reference tracks error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -156,6 +189,15 @@ router.post('/', authMiddleware, upload.single('audio'), async (req: Authenticat
     }
 
     const userId = req.user!.id;
+    const usage = await getUploadUsage(userId);
+    if (usage.limitBytes !== null && usage.usedBytes + req.file.size > usage.limitBytes) {
+      res.status(413).json({
+        error: 'Free uploads are limited to 50 MB. Delete older uploads to free up space.',
+        uploadUsage: usage,
+      });
+      return;
+    }
+
     const trackId = generateUUID();
     const originalFilename = req.file.originalname;
     const ext = path.extname(originalFilename) || '.mp3';
@@ -181,6 +223,10 @@ router.post('/', authMiddleware, upload.single('audio'), async (req: Authenticat
       track: {
         ...result.rows[0],
         audio_url: audioUrl
+      },
+      uploadUsage: {
+        ...usage,
+        usedBytes: usage.usedBytes + req.file.size,
       },
       whisper_available: whisperAvailable
     });
@@ -314,7 +360,10 @@ router.delete('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Res
     // Delete from database
     await pool.query('DELETE FROM reference_tracks WHERE id = $1', [req.params.id]);
 
-    res.json({ success: true });
+    res.json({
+      success: true,
+      uploadUsage: await getUploadUsage(req.user!.id),
+    });
   } catch (error) {
     console.error('Delete reference track error:', error);
     res.status(500).json({ error: 'Internal server error' });

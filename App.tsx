@@ -143,6 +143,14 @@ function AppContent() {
     audio_url: string;
   }
 
+  interface UploadUsage {
+    usedBytes: number;
+    limitBytes: number | null;
+    plan: string;
+  }
+
+  const [referenceUploadUsage, setReferenceUploadUsage] = useState<UploadUsage | null>(null);
+
   const showToast = (message: string, type: ToastType = 'success') => {
     setToast({ message, type, isVisible: true });
   };
@@ -420,6 +428,9 @@ function AppContent() {
       if (!response.ok) return;
       const data = await response.json();
       setReferenceTracks(data.tracks || []);
+      if (data.uploadUsage) {
+        setReferenceUploadUsage(data.uploadUsage);
+      }
     } catch (error) {
       console.error('Failed to load reference tracks:', error);
     }
@@ -464,6 +475,9 @@ function AppContent() {
         setReferenceTracks(prev => [data.track, ...prev]);
       } else {
         await loadReferenceTracks();
+      }
+      if (data.uploadUsage) {
+        setReferenceUploadUsage(data.uploadUsage);
       }
       showToast(t('uploaded'));
     } catch (error) {
@@ -1193,7 +1207,11 @@ function AppContent() {
           if (!response.ok) {
             throw new Error('Failed to delete upload');
           }
+          const data = await response.json().catch(() => ({}));
           setReferenceTracks(prev => prev.filter(track => track.id !== trackId));
+          if (data.uploadUsage) {
+            setReferenceUploadUsage(data.uploadUsage);
+          }
           showToast(t('songDeleted'));
         } catch (error) {
           console.error('Failed to delete upload:', error);
@@ -1311,6 +1329,7 @@ function AppContent() {
             likedSongs={songs.filter(s => likedSongIds.has(s.id))}
             playlists={playlists}
             referenceTracks={referenceTracks}
+            referenceUploadUsage={referenceUploadUsage}
             onPlaySong={playSong}
             onCreatePlaylist={() => {
               setSongToAddToPlaylist(null);
