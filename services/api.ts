@@ -66,6 +66,7 @@ export interface User {
   plan?: string;
   accountTier?: string;
   credit_balance?: number;
+  unlimitedCredits?: boolean;
   xp?: number;
   level?: number;
   badges?: UserBadge[];
@@ -487,6 +488,7 @@ export const creditsApi = {
       balance: number;
       lastDailyClaimAt: string | null;
       streakDays: number;
+      unlimited?: boolean;
     };
     costs: {
       lyricsDraft: number;
@@ -518,6 +520,7 @@ export const creditsApi = {
       balance: number;
       lastDailyClaimAt: string | null;
       streakDays: number;
+      unlimited?: boolean;
       claimed: boolean;
       grantAmount: number;
       reason?: string;

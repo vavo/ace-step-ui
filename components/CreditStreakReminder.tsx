@@ -4,6 +4,7 @@ import { useI18n } from '../context/I18nContext';
 
 interface CreditStreakReminderProps {
   balance: number;
+  unlimited?: boolean;
   cost: number;
   hasEnoughCredits: boolean;
   isLoading: boolean;
@@ -24,6 +25,7 @@ function claimedToday(lastDailyClaimAt?: string | null): boolean {
 
 export const CreditStreakReminder: React.FC<CreditStreakReminderProps> = ({
   balance,
+  unlimited = false,
   cost,
   hasEnoughCredits,
   isLoading,
@@ -34,7 +36,7 @@ export const CreditStreakReminder: React.FC<CreditStreakReminderProps> = ({
   onClaimDaily,
 }) => {
   const { t } = useI18n();
-  const alreadyClaimed = claimedToday(lastDailyClaimAt);
+  const alreadyClaimed = unlimited || claimedToday(lastDailyClaimAt);
 
   return (
     <div className="rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-suno-card p-3 space-y-3">
@@ -45,10 +47,12 @@ export const CreditStreakReminder: React.FC<CreditStreakReminderProps> = ({
           </div>
           <div className="min-w-0">
             <div className="text-xs font-bold text-zinc-900 dark:text-white">
-              {isLoading ? t('loading') : `${balance} ${t('creditsShort')}`}
+              {isLoading ? t('loading') : unlimited ? t('unlimitedCredits') : `${balance} ${t('creditsShort')}`}
             </div>
             <div className={`text-[11px] ${hasEnoughCredits ? 'text-zinc-500 dark:text-zinc-400' : 'text-rose-500 dark:text-rose-300'}`}>
-              {hasEnoughCredits
+              {unlimited
+                ? t('unlimitedCredits')
+                : hasEnoughCredits
                 ? `${cost} ${t('creditsShort')} / ${t('createButton')}`
                 : t('needCredits').replace('{count}', String(Math.max(0, cost - balance)))}
             </div>
@@ -57,11 +61,11 @@ export const CreditStreakReminder: React.FC<CreditStreakReminderProps> = ({
         <button
           type="button"
           onClick={onClaimDaily}
-          disabled={isClaiming || isLoading || alreadyClaimed}
+          disabled={unlimited || isClaiming || isLoading || alreadyClaimed}
           className="h-9 px-3 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
         >
           {isClaiming ? <Loader2 size={14} className="animate-spin" /> : <Gift size={14} />}
-          {alreadyClaimed ? t('claimedToday') : t('claimDaily')}
+          {unlimited ? t('unlimitedCredits') : alreadyClaimed ? t('claimedToday') : t('claimDaily')}
         </button>
       </div>
       <div className="flex items-center justify-between gap-3 text-[11px] text-zinc-500 dark:text-zinc-400">

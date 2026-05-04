@@ -39,7 +39,8 @@ export const config = {
   // OpenAI API (optional fallback for formatting)
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    model: process.env.OPENAI_MODEL || 'gpt-5.5',
+    reasoningEffort: (process.env.OPENAI_REASONING_EFFORT || 'high') as 'none' | 'low' | 'medium' | 'high' | 'xhigh',
   },
 
   // Formatting provider
@@ -60,6 +61,7 @@ export const config = {
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     googleCallbackUrl: process.env.GOOGLE_OAUTH_CALLBACK_URL || '',
     sessionDays: parseInt(process.env.AUTH_SESSION_DAYS || '30', 10),
+    superadminEmail: (process.env.SUPERADMIN_EMAIL || '').trim().toLowerCase(),
   },
 
   // Storage (local only)

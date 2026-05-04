@@ -33,6 +33,7 @@ interface CreditInfo {
   balance: number;
   lastDailyClaimAt: string | null;
   streakDays: number;
+  unlimited?: boolean;
   costs: {
     lyricsDraft: number;
     generationVariation: number;
@@ -346,6 +347,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         balance: result.credits.balance,
         lastDailyClaimAt: result.credits.lastDailyClaimAt,
         streakDays: result.credits.streakDays,
+        unlimited: result.credits.unlimited,
         costs: result.costs,
         daily: {
           claimAmount: result.daily.claimAmount,
@@ -375,6 +377,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         balance: result.credits.balance,
         lastDailyClaimAt: result.credits.lastDailyClaimAt,
         streakDays: result.credits.streakDays,
+        unlimited: result.credits.unlimited,
       } : prev);
       setCreditMessage(result.credits.claimed
         ? `+${result.credits.grantAmount} ${t('creditsShort')}`
@@ -1069,7 +1072,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const safeBatchSize = clampInt(batchSize, 1, 1, 4);
   const safeBulkCount = clampInt(bulkCount, 1, 1, 10);
   const generationCreditCost = safeBatchSize * safeBulkCount * (creditInfo?.costs.generationVariation ?? 20);
-  const hasEnoughCredits = !creditInfo || creditInfo.balance >= generationCreditCost;
+  const hasEnoughCredits = !creditInfo || Boolean(creditInfo.unlimited) || creditInfo.balance >= generationCreditCost;
 
   const handleGenerate = () => {
     if (!hasEnoughCredits) {
@@ -2820,6 +2823,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         {isAuthenticated && (
           <CreditStreakReminder
             balance={creditInfo?.balance ?? user?.credit_balance ?? 0}
+            unlimited={Boolean(creditInfo?.unlimited || user?.unlimitedCredits)}
             cost={generationCreditCost}
             hasEnoughCredits={hasEnoughCredits}
             isLoading={isLoadingCredits}

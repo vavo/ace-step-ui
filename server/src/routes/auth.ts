@@ -10,7 +10,7 @@ import {
   buildUserPayload,
   clearSession,
   createSession,
-  issueAccessToken,
+  issueUserAccessToken,
   OAUTH_STATE_COOKIE,
   readCookie,
   userSelectFields,
@@ -247,10 +247,7 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
     }
 
     // Generate token
-    const token = issueAccessToken({
-      id: user.id,
-      username: user.username,
-    });
+    const token = issueUserAccessToken(user);
 
     await createSession(res, user.id);
     res.status(200).json({
@@ -475,11 +472,7 @@ router.get('/session', optionalAuthMiddleware, async (req: AuthenticatedRequest,
     }
 
     const user = result.rows[0];
-    const token = issueAccessToken({
-      id: user.id,
-      username: user.username,
-      isAdmin: Boolean(user.is_admin),
-    });
+    const token = issueUserAccessToken(user);
 
     res.json({ authenticated: true, user: buildUserPayload(user), token });
   } catch (error) {
@@ -501,11 +494,7 @@ router.get('/me', authMiddleware, async (req: AuthenticatedRequest, res: Respons
     }
 
     const user = result.rows[0];
-    const token = issueAccessToken({
-      id: user.id,
-      username: user.username,
-      isAdmin: Boolean(user.is_admin),
-    });
+    const token = issueUserAccessToken(user);
 
     res.json({ user: buildUserPayload(user), token });
   } catch (error) {
@@ -561,10 +550,7 @@ router.patch('/username', authMiddleware, async (req: AuthenticatedRequest, res:
     const user = result.rows[0];
 
     // Issue new token with updated username
-    const token = issueAccessToken({
-      id: user.id,
-      username: user.username,
-    });
+    const token = issueUserAccessToken(user);
 
     res.json({ user: buildUserPayload(user), token });
   } catch (error) {
@@ -593,10 +579,7 @@ router.post('/refresh', authMiddleware, async (req: AuthenticatedRequest, res: R
     }
 
     const user = result.rows[0];
-    const token = issueAccessToken({
-      id: user.id,
-      username: user.username,
-    });
+    const token = issueUserAccessToken(user);
 
     res.json({ user: buildUserPayload(user), token });
   } catch (error) {

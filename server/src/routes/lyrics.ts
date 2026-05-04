@@ -51,16 +51,16 @@ async function draftLyricsWithOpenAI(input: Required<LyricsDraftBody>): Promise<
   }
 
   const prompt = `
-You write catchy song drafts for Slovak teenagers.
+You write catchy song drafts.
 Return ONLY JSON with keys: title, lyrics, stylePrompt, language.
 Language must be "${input.language}" unless the user prompt clearly asks for another language.
-Lyrics must include simple section labels like [Verse] and [Chorus].
-Keep the lyrics original, singable, emotionally direct, and suitable for teenagers.
+Lyrics must include section labels like [Verse] and [Chorus] in the language of generated lyrics.
+Keep the lyrics original, memorable, singable, emotionally direct, and suitable for 18+ audiences unless specified by the user.
 Do not mention that you are an AI.
 
 User prompt: ${input.prompt}
 Mood: ${input.mood || 'auto'}
-Style: ${input.style || 'modern pop / rap / hyperpop depending on prompt'}
+Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on prompt'}
 `.trim();
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -72,6 +72,7 @@ Style: ${input.style || 'modern pop / rap / hyperpop depending on prompt'}
     body: JSON.stringify({
       model: config.openai.model,
       messages: [{ role: 'user', content: prompt }],
+      reasoning_effort: config.openai.reasoningEffort,
       temperature: 0.9,
       top_p: 0.95,
       max_tokens: 900,

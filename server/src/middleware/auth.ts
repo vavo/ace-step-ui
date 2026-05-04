@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../db/pool.js';
 import { readAuthenticatedUser } from '../services/authSessions.js';
+import { isSuperadminEmail } from '../services/superadmin.js';
 
 export interface AuthenticatedUser {
   id: string;
@@ -57,11 +58,11 @@ export async function adminMiddleware(
     }
 
     const result = await pool.query(
-      'SELECT is_admin FROM users WHERE id = ?',
+      'SELECT email, is_admin FROM users WHERE id = ?',
       [user.id]
     );
 
-    if (result.rows.length === 0 || !result.rows[0].is_admin) {
+    if (result.rows.length === 0 || (!result.rows[0].is_admin && !isSuperadminEmail(result.rows[0].email))) {
       res.status(403).json({ error: 'Admin access required' });
       return;
     }

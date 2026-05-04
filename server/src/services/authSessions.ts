@@ -5,6 +5,7 @@ import { config } from '../config/index.js';
 import { pool } from '../db/pool.js';
 import { generateUUID } from '../db/sqlite.js';
 import type { AuthenticatedUser } from '../middleware/auth.js';
+import { isSuperadminEmail } from './superadmin.js';
 
 export const SESSION_COOKIE = 'acestep_session';
 export const OAUTH_STATE_COOKIE = 'acestep_oauth_state';
@@ -40,6 +41,7 @@ function cookieOptions(maxAgeMs: number) {
 }
 
 export function buildUserPayload(user: { [key: string]: unknown }) {
+  const isSuperadmin = isSuperadminEmail(user.email);
   return {
     id: user.id,
     username: user.username,
@@ -49,14 +51,15 @@ export function buildUserPayload(user: { [key: string]: unknown }) {
     bio: user.bio,
     avatar_url: user.avatar_url,
     banner_url: user.banner_url,
-    isAdmin: Boolean(user.is_admin),
+    isAdmin: Boolean(user.is_admin) || isSuperadmin,
     createdAt: user.created_at,
     created_at: user.created_at,
     default_vocal_language: user.default_vocal_language || 'en',
     default_ui_language: user.default_ui_language || 'sk',
     plan: user.plan || 'free',
-    accountTier: user.plan || 'free',
+    accountTier: isSuperadmin ? 'superadmin' : user.plan || 'free',
     credit_balance: user.credit_balance ?? 0,
+    unlimitedCredits: isSuperadmin,
     xp: user.xp ?? 0,
     level: user.level ?? 1,
   };
@@ -64,6 +67,14 @@ export function buildUserPayload(user: { [key: string]: unknown }) {
 
 export function issueAccessToken(payload: { id: string; username: string; isAdmin?: boolean }): string {
   return jwt.sign(payload, config.jwt.secret, jwtOptions);
+}
+
+export function issueUserAccessToken(user: { [key: string]: unknown }): string {
+  return issueAccessToken({
+    id: String(user.id),
+    username: String(user.username),
+    isAdmin: Boolean(user.is_admin) || isSuperadminEmail(user.email),
+  });
 }
 
 function hashToken(token: string): string {
@@ -113,7 +124,7 @@ export async function readSessionUser(req: Request): Promise<AuthenticatedUser |
   if (!token) return null;
 
   const result = await pool.query(
-    `SELECT u.id, u.username, u.is_admin
+    `SELECT u.id, u.username, u.email, u.is_admin
      FROM auth_sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > datetime('now')
@@ -127,7 +138,7 @@ export async function readSessionUser(req: Request): Promise<AuthenticatedUser |
   return {
     id: user.id,
     username: user.username,
-    isAdmin: Boolean(user.is_admin),
+    isAdmin: Boolean(user.is_admin) || isSuperadminEmail(user.email),
   };
 }
 
@@ -148,11 +159,7 @@ export async function readAuthenticatedUser(req: Request): Promise<Authenticated
 
 export function authResponse(user: { [key: string]: unknown }, res: Response) {
   const payload = buildUserPayload(user);
-  const token = issueAccessToken({
-    id: String(user.id),
-    username: String(user.username),
-    isAdmin: Boolean(user.is_admin),
-  });
+  const token = issueUserAccessToken(user);
 
   return res.json({ user: payload, token });
 }

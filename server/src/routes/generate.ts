@@ -240,6 +240,7 @@ Top-p: ${input.topP || 'N/A'}
       body: JSON.stringify({
         model: config.openai.model,
         messages: [{ role: 'user', content: payloadPrompt }],
+        reasoning_effort: config.openai.reasoningEffort,
         temperature: input.temperature ?? 0.85,
         top_p: input.topP ?? 0.95,
         max_tokens: 700,

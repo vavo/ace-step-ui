@@ -1,6 +1,7 @@
 import { db, generateUUID, transaction } from '../db/sqlite.js';
 import { config } from '../config/index.js';
 import { awardBadge } from './gamification.js';
+import { isSuperadminEmail } from './superadmin.js';
 
 export const CREDIT_AMOUNTS = {
   signupGrant: 100,
@@ -11,6 +12,8 @@ export const CREDIT_AMOUNTS = {
   lyricDraft: 2,
   generationVariation: 20,
 } as const;
+
+const SUPERADMIN_DISPLAY_BALANCE = 999_999_999;
 
 export type CreditReason =
   | 'signup_grant'
@@ -32,6 +35,7 @@ export class InsufficientCreditsError extends Error {
 
 type UserCreditRow = {
   id: string;
+  email: string | null;
   credit_balance: number | null;
   last_daily_credit_claim_at: string | null;
   credit_streak_days: number | null;
@@ -41,6 +45,7 @@ export type CreditSummary = {
   balance: number;
   lastDailyClaimAt: string | null;
   streakDays: number;
+  unlimited?: boolean;
 };
 
 export type CreditLedgerEntry = {
@@ -57,7 +62,7 @@ export type CreditLedgerEntry = {
 export type DailyClaimResult = CreditSummary & {
   claimed: boolean;
   grantAmount: number;
-  reason?: 'already_claimed' | 'balance_cap_reached';
+  reason?: 'already_claimed' | 'balance_cap_reached' | 'unlimited_credits';
 };
 
 export function calculateGenerationCreditCost(variationCount: number | undefined): number {
@@ -67,13 +72,22 @@ export function calculateGenerationCreditCost(variationCount: number | undefined
 
 export function getCreditSummary(userId: string): CreditSummary {
   const row = db.prepare(
-    `SELECT id, credit_balance, last_daily_credit_claim_at, credit_streak_days
+    `SELECT id, email, credit_balance, last_daily_credit_claim_at, credit_streak_days
      FROM users
      WHERE id = ?`
   ).get(userId) as UserCreditRow | undefined;
 
   if (!row) {
     throw new Error('User not found');
+  }
+
+  if (isSuperadminEmail(row.email)) {
+    return {
+      balance: SUPERADMIN_DISPLAY_BALANCE,
+      lastDailyClaimAt: row.last_daily_credit_claim_at,
+      streakDays: row.credit_streak_days ?? 0,
+      unlimited: true,
+    };
   }
 
   return {
@@ -204,6 +218,8 @@ export function reserveCredits(params: {
 }): CreditSummary {
   return transaction(() => {
     const summary = getCreditSummary(params.userId);
+    if (summary.unlimited) return summary;
+
     if (summary.balance < params.amount) {
       throw new InsufficientCreditsError(summary.balance, params.amount);
     }
@@ -234,6 +250,8 @@ export function refundCredits(params: {
 }): CreditSummary {
   return transaction(() => {
     const summary = getCreditSummary(params.userId);
+    if (summary.unlimited) return summary;
+
     const nextBalance = summary.balance + params.amount;
     db.prepare('UPDATE users SET credit_balance = ?, updated_at = datetime(\'now\') WHERE id = ?').run(nextBalance, params.userId);
     recordCreditLedgerEntry({
@@ -283,6 +301,10 @@ function daysBetween(first: string, second: string): number {
 export function claimDailyCredits(userId: string, now = new Date()): DailyClaimResult {
   return transaction(() => {
     const summary = getCreditSummary(userId);
+    if (summary.unlimited) {
+      return { ...summary, claimed: false, grantAmount: 0, reason: 'unlimited_credits' };
+    }
+
     const today = dateKey(now);
     const lastClaimDate = summary.lastDailyClaimAt ? dateKey(new Date(summary.lastDailyClaimAt)) : null;
 
