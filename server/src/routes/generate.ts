@@ -207,12 +207,28 @@ function parseGeminiJson(text: string): GeminiFormatResult | null {
   }
 }
 
+type CaptionOutputLanguage = 'en' | 'sk' | 'cs';
+
+function captionLanguageLabel(language: CaptionOutputLanguage): string {
+  switch (language) {
+    case 'sk':
+      return 'Slovak';
+    case 'cs':
+      return 'Czech';
+    default:
+      return 'English';
+  }
+}
+
 function buildFormatPrompt(input: GeminiFormatInput): string {
+  const captionLanguage = inferCaptionOutputLanguage(input);
   return `
 You improve ACE-Step music generation prompts.
 Return ONLY JSON with keys: caption, lyrics, bpm, duration, key_scale, time_signature, vocal_language.
 
 Hard rules:
+- Return "caption" in ${captionLanguageLabel(captionLanguage)}. Keep genre names like jungle, drum and bass, trap, techno, LoRA, BPM, CFG, Top-K unchanged when they are natural technical terms.
+- The "caption" is shown to the user as the song about text, so keep it natural and user-facing.
 - Preserve the user's explicit genre, style, language, vocal gender, vocal tone, mood/emotion, BPM, key, time signature, and instrumentation.
 - Do not replace the requested genre with another genre or add novelty genres/effects not requested by the user.
 - Do not turn a vocal song request into an instrumental unless the user explicitly asks for instrumental.
@@ -256,6 +272,8 @@ Rules:
 - Preserve every explicit user constraint: genre, subgenre, language, vocal gender, vocal tone, mood/emotion, BPM, key, time signature, duration, instrumentation, and vocal vs instrumental intent.
 - Never replace a requested genre with a different genre.
 - Never turn a vocal request into an instrumental request unless the user explicitly asks for instrumental.
+- Return the user-facing caption in the same language as the user's caption unless the user explicitly asks for another caption language.
+- For Slovak or Czech input, keep the caption/about text in Slovak or Czech. Keep natural genre names and technical terms unchanged.
 - If lyrics are missing and the user did not ask for instrumental music, generate complete original lyrics that match the requested caption, language, mood, and genre.
 - Never add novelty concepts, meme elements, sound effects, or unrelated instruments unless the user asks for them.
 - If the user writes in Slovak/Czech or requests Slovak/Czech vocals, preserve that language request.
@@ -387,6 +405,21 @@ function matchingLanguage(text: string): LanguageIntent | undefined {
   return LANGUAGE_RULES.find(rule => includesAny(text, rule.patterns));
 }
 
+function inferCaptionOutputLanguage(input: GeminiFormatInput): CaptionOutputLanguage {
+  const rawSource = `${input.caption}\n${input.lyrics || ''}`;
+  const source = normalizeIntentText(rawSource);
+  const explicitLanguage = matchingLanguage(source);
+  if (explicitLanguage?.code === 'sk' || explicitLanguage?.code === 'cs') return explicitLanguage.code;
+
+  const hasSlovakDiacritics = /[áäčďéíĺľňóôŕšťúýž]/i.test(rawSource);
+  const hasSlovakWords = includesAny(source, [
+    /\b(chcem|spravit|urobit|pesnicku|piesen|skladbu|slovensk\w*|zensky\w*|zenskym|muzsky\w*|muzskym|hlasom|vokalom|textom|refr[eé]n|sloha|laska|zivot)\b/,
+  ]);
+
+  if (hasSlovakDiacritics || hasSlovakWords) return 'sk';
+  return 'en';
+}
+
 function parseBpm(text: string, explicitBpm?: number): number | undefined {
   if (Number.isFinite(explicitBpm) && explicitBpm && explicitBpm > 0) return Math.round(explicitBpm);
   const match = text.match(/\b([6-9]\d|1\d{2}|2[0-4]\d|250)\s*bpm\b/);
@@ -453,6 +486,87 @@ function buildIntentCaption(intent: ExtractedFormatIntent, originalCaption: stri
   return parts.join(' ');
 }
 
+function buildSlovakIntentCaption(intent: ExtractedFormatIntent, originalCaption: string): string {
+  const parts: string[] = [];
+  const trimmedCaption = originalCaption.trim();
+  const genreText = intent.genres.length > 0
+    ? intent.genres.map(genre => genre.label).join(', ')
+    : trimmedCaption;
+
+  parts.push(`Vylepšený hudobný prompt podľa zadania: "${trimmedCaption}".`);
+  parts.push(`Zachovaj štýl: ${genreText}.`);
+
+  if (intent.mustBeVocal) {
+    const vocalParts = [
+      ...intent.vocalToneRules.map(rule => rule.label),
+      intent.vocalGender === 'female' ? 'ženský hlavný vokál' : intent.vocalGender === 'male' ? 'mužský hlavný vokál' : 'hlavný vokál',
+      intent.language?.code === 'sk' ? 'v slovenčine' : intent.language ? `v jazyku ${intent.language.label}` : '',
+    ].filter(Boolean);
+    parts.push(`Vokály: ${vocalParts.join(', ')} s prirodzeným frázovaním a jasným miestom v mixe.`);
+  } else if (intent.instrumental) {
+    parts.push('Inštrumentálna aranžmá bez hlavného vokálu.');
+  }
+
+  if (intent.moodRules.length > 0) {
+    parts.push(`Nálada: ${intent.moodRules.map(rule => rule.label).join(', ')}.`);
+  }
+
+  if (intent.bpm) parts.push(`Tempo: približne ${intent.bpm} BPM.`);
+  if (intent.duration) parts.push(`Cieľová dĺžka: približne ${intent.duration} sekúnd.`);
+  if (intent.keyScale) parts.push(`Tónina: ${intent.keyScale}.`);
+  if (intent.timeSignature) parts.push(`Takt: ${intent.timeSignature}.`);
+
+  parts.push('Nepridávaj nesúvisiace žánre, meme prvky, novelty zvuky ani nástroje, ktoré odporujú zadaniu.');
+  return parts.join(' ');
+}
+
+function buildCzechIntentCaption(intent: ExtractedFormatIntent, originalCaption: string): string {
+  const parts: string[] = [];
+  const trimmedCaption = originalCaption.trim();
+  const genreText = intent.genres.length > 0
+    ? intent.genres.map(genre => genre.label).join(', ')
+    : trimmedCaption;
+
+  parts.push(`Vylepšený hudební prompt podle zadání: "${trimmedCaption}".`);
+  parts.push(`Zachovej styl: ${genreText}.`);
+
+  if (intent.mustBeVocal) {
+    const vocalParts = [
+      ...intent.vocalToneRules.map(rule => rule.label),
+      intent.vocalGender === 'female' ? 'ženský hlavní vokál' : intent.vocalGender === 'male' ? 'mužský hlavní vokál' : 'hlavní vokál',
+      intent.language?.code === 'cs' ? 'v češtině' : intent.language ? `v jazyce ${intent.language.label}` : '',
+    ].filter(Boolean);
+    parts.push(`Vokály: ${vocalParts.join(', ')} s přirozeným frázováním a jasným místem v mixu.`);
+  } else if (intent.instrumental) {
+    parts.push('Instrumentální aranžmá bez hlavního vokálu.');
+  }
+
+  if (intent.moodRules.length > 0) {
+    parts.push(`Nálada: ${intent.moodRules.map(rule => rule.label).join(', ')}.`);
+  }
+
+  if (intent.bpm) parts.push(`Tempo: přibližně ${intent.bpm} BPM.`);
+  if (intent.duration) parts.push(`Cílová délka: přibližně ${intent.duration} sekund.`);
+  if (intent.keyScale) parts.push(`Tónina: ${intent.keyScale}.`);
+  if (intent.timeSignature) parts.push(`Takt: ${intent.timeSignature}.`);
+
+  parts.push('Nepřidávej nesouvisející žánry, meme prvky, novelty zvuky ani nástroje, které odporují zadání.');
+  return parts.join(' ');
+}
+
+function buildLocalizedIntentCaption(intent: ExtractedFormatIntent, originalCaption: string, language: CaptionOutputLanguage): string {
+  if (language === 'sk') return buildSlovakIntentCaption(intent, originalCaption);
+  if (language === 'cs') return buildCzechIntentCaption(intent, originalCaption);
+  return buildIntentCaption(intent, originalCaption);
+}
+
+function looksLikeEnglishCaption(caption: string): boolean {
+  const normalized = normalizeIntentText(caption);
+  return includesAny(normalized, [
+    /\b(song|track|with|features|female|male|vocals|lead vocal|clear presence|mix|mood|emotion|tempo|target duration|do not add|unrelated genres)\b/,
+  ]);
+}
+
 function intentViolations(intent: ExtractedFormatIntent, result: GeminiFormatResult): string[] {
   const caption = normalizeIntentText(result.caption || '');
   const violations: string[] = [];
@@ -504,10 +618,11 @@ function intentViolations(intent: ExtractedFormatIntent, result: GeminiFormatRes
 function preserveExplicitFormatIntent(input: GeminiFormatInput, result: GeminiFormatResult): GeminiFormatResult {
   const intent = extractFormatIntent(input);
   const violations = intentViolations(intent, result);
+  const captionLanguage = inferCaptionOutputLanguage(input);
   let caption = result.caption || input.caption;
 
-  if (violations.length > 0) {
-    caption = buildIntentCaption(intent, input.caption);
+  if (violations.length > 0 || (captionLanguage !== 'en' && looksLikeEnglishCaption(caption))) {
+    caption = buildLocalizedIntentCaption(intent, input.caption, captionLanguage);
   }
 
   return {
