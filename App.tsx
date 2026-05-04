@@ -180,11 +180,10 @@ function AppContent() {
     </div>
   );
 
-  // Show username modal if not authenticated and not loading
+  // Keep auth modal in sync with auth state.
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      setShowUsernameModal(true);
-    }
+    if (authLoading) return;
+    setShowUsernameModal(!isAuthenticated);
   }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
