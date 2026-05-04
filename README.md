@@ -422,6 +422,7 @@ Full control over every parameter:
 | **Genre always sounds like ballad** | Enable **AI Enhance** toggle in the Style section — it enriches your tags with proper metadata |
 | **AttributeError: 'NoneType'** | Update to latest ACE-Step-1.5 (fix merged in PR #109) |
 | **Songs show 0:00 duration** | Install FFmpeg: `sudo apt install ffmpeg` |
+| **FLAC/reference playback or MP3 fallback fails** | Install FFmpeg: `sudo apt-get install -y ffmpeg` |
 | **LAN access not working** | Check firewall allows ports 3000 and 3001 |
 
 ---

@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import { Readable } from 'node:stream';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/pool.js';
@@ -8,21 +7,13 @@ import { authMiddleware, optionalAuthMiddleware, AuthenticatedRequest } from '..
 import { getStorageProvider } from '../services/storage/factory.js';
 import { recordComment, recordPublishedSong, recordSongLike, recordSongPlay } from '../services/gamification.js';
 import { checkRateLimit } from '../services/rateLimit.js';
-import { config } from '../config/index.js';
 import { transcodeToMp3 } from '../services/audioTranscode.js';
+import { readLocalAudioFile } from '../services/localAudio.js';
 
 const router = Router();
 
 function isFlacAudio(value: string | null): boolean {
   return Boolean(value && /\.flac(?:$|\?)/i.test(value));
-}
-
-function localAudioPath(audioUrl: string): string | null {
-  if (!audioUrl.startsWith('/audio/')) return null;
-  const cleanKey = audioUrl.slice('/audio/'.length).replace(/^\/+/, '');
-  const root = path.resolve(config.storage.audioDir);
-  const resolved = path.resolve(root, cleanKey);
-  return resolved === root || resolved.startsWith(`${root}${path.sep}`) ? resolved : null;
 }
 
 function contentTypeForAudioPath(audioUrl: string): string {
@@ -107,15 +98,14 @@ router.get('/:id/audio', optionalAuthMiddleware, async (req: AuthenticatedReques
     // Local files: proxy through this route so private song audio is not exposed
     // by generic static hosting. Transcode FLAC for Safari/WebKit.
     if (audioUrl.startsWith('/')) {
-      const filePath = localAudioPath(audioUrl);
-      if (!filePath) {
-        res.status(404).json({ error: 'Audio not available' });
-        return;
-      }
-
       let buffer: Buffer;
       try {
-        buffer = await readFile(filePath);
+        const localBuffer = await readLocalAudioFile(audioUrl);
+        if (!localBuffer) {
+          res.status(404).json({ error: 'Audio not available' });
+          return;
+        }
+        buffer = localBuffer;
       } catch (error) {
         console.error('Local audio read failed:', error);
         res.status(404).json({ error: 'Audio not available' });

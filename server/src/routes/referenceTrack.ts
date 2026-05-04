@@ -8,6 +8,7 @@ import { generateUUID } from '../db/sqlite.js';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
 import { config } from '../config/index.js';
+import { readLocalAudioFile } from '../services/localAudio.js';
 import { spawn } from 'child_process';
 
 const router = Router();
@@ -316,8 +317,11 @@ router.post('/:id/transcribe', authMiddleware, async (req: AuthenticatedRequest,
       return;
     }
 
-    const audioPath = path.join(config.storage.audioDir, result.rows[0].storage_key);
-    const buffer = await fs.readFile(audioPath);
+    const buffer = await readLocalAudioFile(result.rows[0].storage_key);
+    if (!buffer) {
+      res.status(404).json({ error: 'Audio file not found' });
+      return;
+    }
     const controller = new AbortController();
 
     req.on('close', () => controller.abort());

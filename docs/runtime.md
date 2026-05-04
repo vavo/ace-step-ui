@@ -51,6 +51,15 @@ Use the exact generated RunPod proxy host. Also register the exact Google callba
 
 ## Required Environment
 
+The server expects `ffmpeg` on `PATH`. Install it before starting production:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ffmpeg
+```
+
+Without `ffmpeg`, FLAC playback fallback, uploaded-reference preparation, and browser-safe MP3 conversion can fail.
+
 For local production-like runtime:
 
 ```env
