@@ -1,3 +1,5 @@
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
+import { promisify } from 'util';
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/pool.js';
 import { generateUUID } from '../db/sqlite.js';
@@ -16,9 +18,21 @@ import {
 import { recordSignupGrantIfMissing } from '../services/credits.js';
 
 const router = Router();
+const scrypt = promisify(scryptCallback);
 
 interface SetupBody {
   username: string;
+}
+
+interface EmailRegisterBody {
+  email: string;
+  password: string;
+  username: string;
+}
+
+interface EmailLoginBody {
+  email: string;
+  password: string;
 }
 
 type GoogleTokenResponse = {
@@ -54,6 +68,7 @@ router.get('/options', (_req: Request, res: Response) => {
   res.json({
     googleConfigured: googleConfigured(),
     localAuthAllowed: isLocalAuthAllowed(),
+    emailAuthAllowed: true,
   });
 });
 
@@ -81,7 +96,36 @@ async function createLocalSession(user: { [key: string]: unknown }, res: Respons
   authResponse(user, res);
 }
 
+function normalizeEmail(email: unknown): string {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+}
+
+function isValidPassword(password: unknown): password is string {
+  return typeof password === 'string' && password.length >= 8 && password.length <= 256;
+}
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString('base64url');
+  const derived = await scrypt(password, salt, 64) as Buffer;
+  return `scrypt$${salt}$${derived.toString('base64url')}`;
+}
+
+async function verifyPassword(password: string, storedHash: unknown): Promise<boolean> {
+  if (typeof storedHash !== 'string') return false;
+  const [scheme, salt, encodedHash] = storedHash.split('$');
+  if (scheme !== 'scrypt' || !salt || !encodedHash) return false;
+
+  const expected = Buffer.from(encodedHash, 'base64url');
+  const actual = await scrypt(password, salt, expected.length) as Buffer;
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
 async function upsertGoogleUser(profile: GoogleProfile) {
+  const profileEmail = normalizeEmail(profile.email) || null;
   const byGoogleSub = await pool.query(`SELECT ${userSelectFields} FROM users WHERE google_sub = ?`, [profile.sub]);
   if (byGoogleSub.rows.length > 0) {
     const user = byGoogleSub.rows[0];
@@ -89,14 +133,14 @@ async function upsertGoogleUser(profile: GoogleProfile) {
       `UPDATE users
        SET email = ?, display_name = ?, avatar_url = COALESCE(avatar_url, ?), auth_provider = 'google', updated_at = datetime('now')
        WHERE id = ?`,
-      [profile.email || null, profile.name || null, profile.picture || null, user.id]
+      [profileEmail, profile.name || null, profile.picture || null, user.id]
     );
     const updated = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [user.id]);
     return updated.rows[0];
   }
 
-  if (profile.email) {
-    const byEmail = await pool.query(`SELECT ${userSelectFields} FROM users WHERE email = ?`, [profile.email]);
+  if (profileEmail) {
+    const byEmail = await pool.query(`SELECT ${userSelectFields} FROM users WHERE email = ?`, [profileEmail]);
     if (byEmail.rows.length > 0) {
       const user = byEmail.rows[0];
       await pool.query(
@@ -110,14 +154,14 @@ async function upsertGoogleUser(profile: GoogleProfile) {
     }
   }
 
-  const emailName = profile.email?.split('@')[0] || '';
+  const emailName = profileEmail?.split('@')[0] || '';
   const username = await uniqueUsername(profile.name || emailName || 'creator');
   const userId = generateUUID();
   await pool.query(
     `INSERT INTO users
        (id, username, email, google_sub, auth_provider, display_name, avatar_url, is_admin, created_at, updated_at)
      VALUES (?, ?, ?, ?, 'google', ?, ?, 0, datetime('now'), datetime('now'))`,
-    [userId, username, profile.email || null, profile.sub, profile.name || null, profile.picture || null]
+    [userId, username, profileEmail, profile.sub, profile.name || null, profile.picture || null]
   );
 
   const newUser = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [userId]);
@@ -245,6 +289,92 @@ router.post('/local-dev', async (req: Request<object, object, Partial<SetupBody>
     await createLocalSession(user, res);
   } catch (error) {
     console.error('Local dev login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/email/register', async (req: Request<object, object, Partial<EmailRegisterBody>>, res: Response) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const password = req.body.password;
+    const username = sanitizeUsername(req.body.username || email.split('@')[0] || 'creator');
+
+    if (!isValidEmail(email)) {
+      res.status(400).json({ error: 'Invalid email address' });
+      return;
+    }
+
+    if (!isValidPassword(password)) {
+      res.status(400).json({ error: 'Password must be at least 8 characters' });
+      return;
+    }
+
+    if (username.length < 2) {
+      res.status(400).json({ error: 'Username must be at least 2 characters' });
+      return;
+    }
+
+    const existingEmail = await pool.query('SELECT id, password_hash FROM users WHERE email = ?', [email]);
+    if (existingEmail.rows.length > 0) {
+      res.status(409).json({ error: 'Email is already registered' });
+      return;
+    }
+
+    const existingUsername = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+    if (existingUsername.rows.length > 0) {
+      res.status(409).json({ error: 'Username is already taken' });
+      return;
+    }
+
+    const userId = generateUUID();
+    const passwordHash = await hashPassword(password);
+    await pool.query(
+      `INSERT INTO users
+         (id, username, email, password_hash, auth_provider, is_admin, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'email', 0, datetime('now'), datetime('now'))`,
+      [userId, username, email, passwordHash]
+    );
+
+    const created = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [userId]);
+    const user = created.rows[0];
+    recordSignupGrantIfMissing(userId);
+    await createLocalSession(user, res);
+  } catch (error) {
+    console.error('Email registration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/email/login', async (req: Request<object, object, Partial<EmailLoginBody>>, res: Response) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const password = req.body.password;
+
+    if (!isValidEmail(email) || !isValidPassword(password)) {
+      res.status(401).json({ error: 'Invalid email or password' });
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT ${userSelectFields}, password_hash FROM users WHERE email = ?`,
+      [email]
+    );
+    const user = result.rows[0];
+    const passwordMatches = user ? await verifyPassword(password, user.password_hash) : false;
+    if (!user || !passwordMatches) {
+      res.status(401).json({ error: 'Invalid email or password' });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE users SET auth_provider = CASE WHEN auth_provider = 'local' THEN 'email' ELSE auth_provider END,
+                        updated_at = datetime('now')
+       WHERE id = ?`,
+      [user.id]
+    );
+    await createLocalSession(user, res);
+  } catch (error) {
+    console.error('Email login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

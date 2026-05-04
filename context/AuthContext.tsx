@@ -7,6 +7,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   setupUser: (username: string) => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  registerWithEmail: (email: string, password: string, username: string) => Promise<void>;
   startGoogleLogin: () => void;
   updateUsername: (username: string) => Promise<void>;
   logout: () => void;
@@ -62,6 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     setToken(newToken);
   }, []);
 
+  const loginWithEmail = useCallback(async (email: string, password: string): Promise<void> => {
+    const { user: userData, token: newToken } = await authApi.emailLogin(email, password);
+    setUser(userData);
+    setToken(newToken);
+  }, []);
+
+  const registerWithEmail = useCallback(async (email: string, password: string, username: string): Promise<void> => {
+    const { user: userData, token: newToken } = await authApi.emailRegister(email, password, username);
+    setUser(userData);
+    setToken(newToken);
+  }, []);
+
   const startGoogleLogin = useCallback((): void => {
     window.location.assign(authApi.googleStartUrl);
   }, []);
@@ -97,6 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     isLoading,
     isAuthenticated,
     setupUser,
+    loginWithEmail,
+    registerWithEmail,
     startGoogleLogin,
     updateUsername,
     logout,

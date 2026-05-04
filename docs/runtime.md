@@ -14,7 +14,7 @@ npm --prefix server install
 
 Open `http://localhost:3000`.
 
-Development mode allows the local nickname login path. Google OAuth is still supported when the Google variables are configured.
+Development mode allows the local nickname login path. Email/password auth is always available, and Google OAuth is available when the Google variables are configured.
 
 ## Production-like Local Runtime
 
@@ -82,7 +82,7 @@ Register that exact Google callback URL in Google Cloud Console.
 
 ## Auth Behavior
 
-- `NODE_ENV=production`: Google OAuth only. Nickname login is disabled.
+- `NODE_ENV=production`: email/password auth is available, Google OAuth is available when configured, and nickname login is disabled.
 - `NODE_ENV=development`: nickname login is available for local testing.
 - The app uses httpOnly session cookies after login.
 

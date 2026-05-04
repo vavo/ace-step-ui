@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   email TEXT,
+  password_hash TEXT,
   google_sub TEXT,
   auth_provider TEXT DEFAULT 'local',
   display_name TEXT,
@@ -262,6 +263,7 @@ function ensureProductColumns(): void {
 
   const existingColumns = getTableColumns('users');
   ensureColumn('users', existingColumns, 'email', 'TEXT');
+  ensureColumn('users', existingColumns, 'password_hash', 'TEXT');
   ensureColumn('users', existingColumns, 'google_sub', 'TEXT');
   ensureColumn('users', existingColumns, 'auth_provider', "TEXT DEFAULT 'local'");
   ensureColumn('users', existingColumns, 'display_name', 'TEXT');

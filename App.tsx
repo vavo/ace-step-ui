@@ -32,7 +32,7 @@ function AppContent() {
   const { t, language, setLanguage } = useI18n();
 
   // Auth
-  const { user, token, isAuthenticated, isLoading: authLoading, setupUser, startGoogleLogin, logout } = useAuth();
+  const { user, token, isAuthenticated, isLoading: authLoading, setupUser, loginWithEmail, registerWithEmail, startGoogleLogin, logout } = useAuth();
   
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   // Track multiple concurrent generation jobs
@@ -1549,6 +1549,8 @@ function AppContent() {
           <UsernameModal
             isOpen={showUsernameModal}
             onSubmit={handleUsernameSubmit}
+            onEmailLogin={loginWithEmail}
+            onEmailRegister={registerWithEmail}
             onGoogleLogin={startGoogleLogin}
           />
       <SettingsModal

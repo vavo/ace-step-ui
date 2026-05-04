@@ -256,7 +256,7 @@ JWT_SECRET=replace_with_a_long_random_secret
 
 For a real deployment, replace every localhost URL with the public HTTPS origin and register the same callback URL in Google Cloud Console.
 
-In `NODE_ENV=production`, nickname login is disabled. Use Google OAuth. For local nickname login, run with `NODE_ENV=development`.
+In `NODE_ENV=production`, nickname login is disabled. Use email/password registration or Google OAuth. For local nickname login, run with `NODE_ENV=development`.
 
 More detail: `docs/runtime.md`.
 

@@ -1,7 +1,7 @@
 # Parallel MVP Plan: Multi-User Slovak Teen Product
 
 ## Summary
-Keep SQLite for MVP, use Google OAuth, daily credits, OpenAI lyric drafting, mobile-first UX, public social loops, weekly leaderboards, and add Stripe subscriptions last.
+Keep SQLite for MVP, use email/password plus Google OAuth, daily credits, OpenAI lyric drafting, mobile-first UX, public social loops, weekly leaderboards, and add Stripe subscriptions last.
 
 Run this as a short sequential stabilization phase, then two parallel implementation waves. The important trick: lock API contracts first so backend and frontend can move independently instead of politely blocking each other like it’s 2009.
 
@@ -26,7 +26,7 @@ Do this first, before parallel work.
 ### Track A: Accounts, Credits, And Generation Backend
 Owner writes mainly server/database/auth/generation code.
 
-- Replace first-user auto-login with Google OAuth and httpOnly session cookies.
+- Replace first-user auto-login with email/password, Google OAuth, and httpOnly session cookies.
 - Add SQLite schema for OAuth identity, sessions, plans, credit balance, credit ledger, XP, levels, and leaderboard event counters.
 - Add credits API:
   - `GET /api/credits/balance`

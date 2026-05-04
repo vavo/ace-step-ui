@@ -48,7 +48,7 @@ async function api<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
   return response.json();
 }
 
-// Auth API (simplified - username only)
+// Auth API
 export interface User {
   id: string;
   username: string;
@@ -106,6 +106,7 @@ export interface SessionResponse {
 export interface AuthOptions {
   googleConfigured: boolean;
   localAuthAllowed: boolean;
+  emailAuthAllowed?: boolean;
 }
 
 export const authApi = {
@@ -119,6 +120,12 @@ export const authApi = {
 
   localDev: (username?: string): Promise<AuthResponse> =>
     api('/api/auth/local-dev', { method: 'POST', body: { username } }),
+
+  emailRegister: (email: string, password: string, username: string): Promise<AuthResponse> =>
+    api('/api/auth/email/register', { method: 'POST', body: { email, password, username } }),
+
+  emailLogin: (email: string, password: string): Promise<AuthResponse> =>
+    api('/api/auth/email/login', { method: 'POST', body: { email, password } }),
 
   me: (token?: string | null): Promise<AuthResponse> =>
     api('/api/auth/me', { token: token || undefined }),
