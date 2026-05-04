@@ -39,7 +39,7 @@ export const config = {
   // OpenAI API (optional fallback for formatting)
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
-    model: process.env.OPENAI_MODEL || 'gpt-5.5',
+    model: process.env.OPENAI_MODEL || 'gpt-5.2',
     reasoningEffort: (process.env.OPENAI_REASONING_EFFORT || 'high') as 'none' | 'low' | 'medium' | 'high' | 'xhigh',
   },
 

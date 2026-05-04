@@ -8,7 +8,7 @@ import { CreatePlaylistModal, AddToPlaylistModal } from './components/PlaylistMo
 import { UsernameModal } from './components/UsernameModal';
 import { SettingsModal } from './components/SettingsModal';
 import { Song, GenerationParams, View, Playlist } from './types';
-import { generateApi, songsApi, playlistsApi, getAudioUrl } from './services/api';
+import { generateApi, songsApi, playlistsApi, getAudioUrl, UserBadge } from './services/api';
 import { useAuth } from './context/AuthContext';
 import { I18nProvider, useI18n } from './context/I18nContext';
 import { Language } from './i18n/translations';
@@ -16,6 +16,7 @@ import { List } from 'lucide-react';
 import { Toast, ToastType } from './components/Toast';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { BadgeAwardModal } from './components/BadgeAwardModal';
 
 const FeedPage = lazy(() => import('./components/FeedPage').then((module) => ({ default: module.FeedPage })));
 const IdeasPage = lazy(() => import('./components/IdeasPage').then((module) => ({ default: module.IdeasPage })));
@@ -117,6 +118,18 @@ function AppContent() {
 
   // Mobile Details Modal State
   const [showMobileDetails, setShowMobileDetails] = useState(false);
+  const [badgeQueue, setBadgeQueue] = useState<UserBadge[]>([]);
+
+  useEffect(() => {
+    const handleNewBadges = (event: Event) => {
+      const badges = (event as CustomEvent<UserBadge[]>).detail;
+      if (!Array.isArray(badges) || badges.length === 0) return;
+      setBadgeQueue(prev => [...prev, ...badges]);
+    };
+
+    window.addEventListener('acestep:new-badges', handleNewBadges);
+    return () => window.removeEventListener('acestep:new-badges', handleNewBadges);
+  }, []);
 
   // Toast State
   const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
@@ -1662,6 +1675,10 @@ function AppContent() {
         message={confirmDialog?.message ?? ''}
         onConfirm={() => confirmDialog?.onConfirm()}
         onCancel={() => setConfirmDialog(null)}
+      />
+      <BadgeAwardModal
+        badge={badgeQueue[0] || null}
+        onClose={() => setBadgeQueue(prev => prev.slice(1))}
       />
     </div>
   );

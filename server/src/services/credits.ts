@@ -1,6 +1,6 @@
 import { db, generateUUID, transaction } from '../db/sqlite.js';
 import { config } from '../config/index.js';
-import { awardBadge } from './gamification.js';
+import { awardBadge, AwardedBadge } from './gamification.js';
 import { isSuperadminEmail } from './superadmin.js';
 
 export const CREDIT_AMOUNTS = {
@@ -63,6 +63,7 @@ export type DailyClaimResult = CreditSummary & {
   claimed: boolean;
   grantAmount: number;
   reason?: 'already_claimed' | 'balance_cap_reached' | 'unlimited_credits';
+  newBadges?: AwardedBadge[];
 };
 
 export function calculateGenerationCreditCost(variationCount: number | undefined): number {
@@ -339,8 +340,10 @@ export function claimDailyCredits(userId: string, now = new Date()): DailyClaimR
       metadata: { streakDays: nextStreakDays, streakBonus },
     });
 
+    const newBadges: AwardedBadge[] = [];
     if (nextStreakDays >= 7) {
-      awardBadge(userId, 'seven_day_streak', { streakDays: nextStreakDays });
+      const badge = awardBadge(userId, 'seven_day_streak', { streakDays: nextStreakDays });
+      if (badge) newBadges.push(badge);
     }
 
     return {
@@ -349,6 +352,7 @@ export function claimDailyCredits(userId: string, now = new Date()): DailyClaimR
       streakDays: nextStreakDays,
       claimed: true,
       grantAmount,
+      newBadges,
     };
   });
 }

@@ -343,11 +343,11 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       ]
     );
 
-    if (result.rows[0]?.is_public) {
-      recordPublishedSong(req.user!.id, result.rows[0].id);
-    }
+    const newBadges = result.rows[0]?.is_public
+      ? recordPublishedSong(req.user!.id, result.rows[0].id)
+      : [];
 
-    res.status(201).json({ song: result.rows[0] });
+    res.status(201).json({ song: result.rows[0], newBadges });
   } catch (error) {
     console.error('Create song error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -485,8 +485,10 @@ router.post('/:id/like', authMiddleware, async (req: AuthenticatedRequest, res: 
         [req.params.id]
       );
       await client.query('COMMIT');
-      recordSongLike(req.params.id, req.user!.id);
-      res.json({ liked: true });
+      const newBadges = recordSongLike(req.params.id, req.user!.id)
+        .filter(badge => badge.user_id === req.user!.id)
+        .map(({ user_id: _userId, ...badge }) => badge);
+      res.json({ liked: true, newBadges });
     }
   } catch (error) {
     await client.query('ROLLBACK');
@@ -546,11 +548,11 @@ router.patch('/:id/privacy', authMiddleware, async (req: AuthenticatedRequest, r
       req.params.id,
     ]);
 
-    if (newPublicState) {
-      recordPublishedSong(req.user!.id, req.params.id);
-    }
+    const newBadges = newPublicState
+      ? recordPublishedSong(req.user!.id, req.params.id)
+      : [];
 
-    res.json({ isPublic: newPublicState });
+    res.json({ isPublic: newPublicState, newBadges });
   } catch (error) {
     console.error('Toggle privacy error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -573,9 +575,13 @@ router.post('/:id/play', optionalAuthMiddleware, async (req: AuthenticatedReques
       return;
     }
 
-    recordSongPlay(req.params.id, req.user?.id);
+    const newBadges = req.user
+      ? recordSongPlay(req.params.id, req.user.id)
+        .filter(badge => badge.user_id === req.user!.id)
+        .map(({ user_id: _userId, ...badge }) => badge)
+      : [];
 
-    res.json({ viewCount: result.rows[0].view_count });
+    res.json({ viewCount: result.rows[0].view_count, newBadges });
   } catch (error) {
     console.error('Track play error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -646,9 +652,9 @@ router.post('/:id/comments', authMiddleware, async (req: AuthenticatedRequest, r
       user_id: req.user!.id,
     };
 
-    recordComment(req.user!.id, req.params.id, result.rows[0].id);
+    const newBadges = recordComment(req.user!.id, req.params.id, result.rows[0].id);
 
-    res.status(201).json({ comment });
+    res.status(201).json({ comment, newBadges });
   } catch (error) {
     console.error('Add comment error:', error);
     res.status(500).json({ error: 'Internal server error' });

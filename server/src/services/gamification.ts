@@ -21,6 +21,16 @@ type BadgeDefinition = {
   color: 'green' | 'pink' | 'yellow' | 'blue';
 };
 
+export type AwardedBadge = BadgeDefinition & {
+  badge_key: BadgeKey;
+  awarded_at: string;
+  metadata: Record<string, unknown> | null;
+};
+
+export type AwardedUserBadge = AwardedBadge & {
+  user_id: string;
+};
+
 const BADGES: Record<BadgeKey, BadgeDefinition> = {
   first_song: {
     id: 'first_song',
@@ -56,11 +66,12 @@ const XP = {
   receiveFollow: 8,
 } as const;
 
-function runGamification(label: string, fn: () => void): void {
+function runGamification<T>(label: string, fallback: T, fn: () => T): T {
   try {
-    fn();
+    return fn();
   } catch (error) {
     console.error(`[Gamification] ${label} failed:`, error);
+    return fallback;
   }
 }
 
@@ -90,14 +101,24 @@ function addXp(userId: string, points: number): void {
   ).run(nextXp, levelForXp(nextXp), userId);
 }
 
-export function awardBadge(userId: string, badgeKey: BadgeKey, metadata?: Record<string, unknown>): void {
-  db.prepare(
+export function awardBadge(userId: string, badgeKey: BadgeKey, metadata?: Record<string, unknown>): AwardedBadge | null {
+  const awardedAt = new Date().toISOString();
+  const result = db.prepare(
     `INSERT OR IGNORE INTO user_badges (user_id, badge_key, metadata, awarded_at)
-     VALUES (?, ?, ?, datetime('now'))`
-  ).run(userId, badgeKey, metadata ? JSON.stringify(metadata) : null);
+     VALUES (?, ?, ?, ?)`
+  ).run(userId, badgeKey, metadata ? JSON.stringify(metadata) : null, awardedAt);
+
+  if (result.changes === 0) return null;
+
+  return {
+    ...BADGES[badgeKey],
+    badge_key: badgeKey,
+    awarded_at: awardedAt,
+    metadata: metadata ?? null,
+  };
 }
 
-function refreshWeeklyTopCreatorBadges(periodStart = getWeekStart()): void {
+function refreshWeeklyTopCreatorBadges(periodStart = getWeekStart()): AwardedUserBadge[] {
   const rows = db.prepare(
     `WITH weekly_songs AS (
        SELECT user_id,
@@ -140,15 +161,20 @@ function refreshWeeklyTopCreatorBadges(periodStart = getWeekStart()): void {
      LIMIT 10`
   ).all(periodStart, periodStart, periodStart) as Array<{ id: string; leaderboard_score: number }>;
 
+  const awards: AwardedUserBadge[] = [];
+
   rows.forEach((row, index) => {
     if ((row.leaderboard_score ?? 0) > 0) {
-      awardBadge(row.id, 'weekly_top_10', {
+      const badge = awardBadge(row.id, 'weekly_top_10', {
         periodStart,
         rank: index + 1,
         leaderboardScore: row.leaderboard_score,
       });
+      if (badge) awards.push({ ...badge, user_id: row.id });
     }
   });
+
+  return awards;
 }
 
 export function getUserBadges(userId: string): Array<BadgeDefinition & {
@@ -190,7 +216,7 @@ function recordLeaderboardEvent(params: {
   eventType: LeaderboardEventType;
   points: number;
   metadata?: Record<string, unknown>;
-}): void {
+}): AwardedUserBadge[] {
   const periodStart = getWeekStart();
   db.prepare(
     `INSERT INTO leaderboard_events
@@ -205,11 +231,12 @@ function recordLeaderboardEvent(params: {
     periodStart,
     params.metadata ? JSON.stringify(params.metadata) : null
   );
-  refreshWeeklyTopCreatorBadges(periodStart);
+  return refreshWeeklyTopCreatorBadges(periodStart);
 }
 
-export function recordPublishedSong(userId: string, songId: string): void {
-  runGamification('record publish', () => {
+export function recordPublishedSong(userId: string, songId: string): AwardedBadge[] {
+  return runGamification('record publish', [], () => {
+    const newBadges: AwardedBadge[] = [];
     const existing = db.prepare(
       `SELECT 1
        FROM leaderboard_events
@@ -223,7 +250,9 @@ export function recordPublishedSong(userId: string, songId: string): void {
         songId,
         eventType: 'publish_song',
         points: XP.publishSong,
-      });
+      })
+        .filter(badge => badge.user_id === userId)
+        .forEach(({ user_id: _userId, ...badge }) => newBadges.push(badge));
       addXp(userId, XP.publishSong);
     }
 
@@ -234,20 +263,24 @@ export function recordPublishedSong(userId: string, songId: string): void {
     ).get(userId) as { count: number };
 
     if (publicSongCount.count >= 1) {
-      awardBadge(userId, 'first_song', { songId });
+      const badge = awardBadge(userId, 'first_song', { songId });
+      if (badge) newBadges.push(badge);
     }
+
+    return newBadges;
   });
 }
 
-export function recordSongLike(songId: string, likedByUserId: string): void {
-  runGamification('record like', () => {
+export function recordSongLike(songId: string, likedByUserId: string): AwardedUserBadge[] {
+  return runGamification('record like', [], () => {
+    const newBadges: AwardedUserBadge[] = [];
     const song = db.prepare(
       `SELECT user_id, like_count
        FROM songs
        WHERE id = ?`
     ).get(songId) as { user_id: string; like_count: number | null } | undefined;
 
-    if (!song || song.user_id === likedByUserId) return;
+    if (!song || song.user_id === likedByUserId) return [];
 
     recordLeaderboardEvent({
       userId: song.user_id,
@@ -255,7 +288,7 @@ export function recordSongLike(songId: string, likedByUserId: string): void {
       eventType: 'song_like',
       points: XP.receiveLike,
       metadata: { likedByUserId },
-    });
+    }).forEach(badge => newBadges.push(badge));
     addXp(song.user_id, XP.receiveLike);
 
     const likes = db.prepare(
@@ -265,22 +298,25 @@ export function recordSongLike(songId: string, likedByUserId: string): void {
     ).get(song.user_id) as { count: number };
 
     if (likes.count >= 10) {
-      awardBadge(song.user_id, 'first_10_likes', { likes: likes.count });
+      const badge = awardBadge(song.user_id, 'first_10_likes', { likes: likes.count });
+      if (badge) newBadges.push({ ...badge, user_id: song.user_id });
     }
+
+    return newBadges;
   });
 }
 
-export function recordSongPlay(songId: string, playedByUserId?: string): void {
-  runGamification('record play', () => {
+export function recordSongPlay(songId: string, playedByUserId?: string): AwardedUserBadge[] {
+  return runGamification('record play', [], () => {
     const song = db.prepare(
       `SELECT user_id
        FROM songs
        WHERE id = ? AND is_public = 1`
     ).get(songId) as { user_id: string } | undefined;
 
-    if (!song) return;
+    if (!song) return [];
 
-    recordLeaderboardEvent({
+    return recordLeaderboardEvent({
       userId: song.user_id,
       songId,
       eventType: 'song_play',
@@ -290,34 +326,39 @@ export function recordSongPlay(songId: string, playedByUserId?: string): void {
   });
 }
 
-export function recordComment(commenterUserId: string, songId: string, commentId: string): void {
-  runGamification('record comment', () => {
-    recordLeaderboardEvent({
+export function recordComment(commenterUserId: string, songId: string, commentId: string): AwardedBadge[] {
+  return runGamification('record comment', [], () => {
+    const newBadges = recordLeaderboardEvent({
       userId: commenterUserId,
       songId,
       eventType: 'comment',
       points: XP.addComment,
       metadata: { commentId },
-    });
+    })
+      .filter(badge => badge.user_id === commenterUserId)
+      .map(({ user_id: _userId, ...badge }) => badge);
     addXp(commenterUserId, XP.addComment);
+    return newBadges;
   });
 }
 
-export function recordFollow(followerId: string, followingId: string): void {
-  runGamification('record follow', () => {
+export function recordFollow(followerId: string, followingId: string): AwardedUserBadge[] {
+  return runGamification('record follow', [], () => {
+    const newBadges: AwardedUserBadge[] = [];
     recordLeaderboardEvent({
       userId: followerId,
       eventType: 'follow_created',
       points: XP.followUser,
       metadata: { followingId },
-    });
+    }).forEach(badge => newBadges.push(badge));
     recordLeaderboardEvent({
       userId: followingId,
       eventType: 'follower_gain',
       points: XP.receiveFollow,
       metadata: { followerId },
-    });
+    }).forEach(badge => newBadges.push(badge));
     addXp(followerId, XP.followUser);
     addXp(followingId, XP.receiveFollow);
+    return newBadges;
   });
 }

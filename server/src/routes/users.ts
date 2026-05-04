@@ -407,7 +407,9 @@ router.post('/:username/follow', authMiddleware, async (req: AuthenticatedReques
                 'INSERT INTO followers (follower_id, following_id) VALUES ($1, $2)',
                 [currentUserId, targetUserId]
             );
-            recordFollow(currentUserId, targetUserId);
+            var newBadges = recordFollow(currentUserId, targetUserId)
+                .filter(badge => badge.user_id === currentUserId)
+                .map(({ user_id: _userId, ...badge }) => badge);
             following = true;
         }
 
@@ -419,7 +421,8 @@ router.post('/:username/follow', authMiddleware, async (req: AuthenticatedReques
 
         res.json({
             following,
-            followerCount: parseInt(countResult.rows[0].count)
+            followerCount: parseInt(countResult.rows[0].count),
+            newBadges: typeof newBadges !== 'undefined' ? newBadges : []
         });
     } catch (error) {
         console.error('Toggle follow error:', error);

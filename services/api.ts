@@ -20,6 +20,41 @@ interface ApiOptions {
   token?: string | null;
 }
 
+function collectNewBadges(value: unknown, badges: unknown[] = []): unknown[] {
+  if (!value || typeof value !== 'object') return badges;
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record.newBadges)) {
+    badges.push(...record.newBadges);
+  }
+
+  Object.values(record).forEach(child => {
+    if (child && typeof child === 'object') {
+      collectNewBadges(child, badges);
+    }
+  });
+
+  return badges;
+}
+
+function emitNewBadges(value: unknown): void {
+  if (typeof window === 'undefined') return;
+
+  const seen = new Set<string>();
+  const badges = collectNewBadges(value).filter((badge) => {
+    if (!badge || typeof badge !== 'object') return false;
+    const record = badge as Record<string, unknown>;
+    const key = `${record.badge_key || record.id || 'badge'}:${record.awarded_at || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (badges.length > 0) {
+    window.dispatchEvent(new CustomEvent('acestep:new-badges', { detail: badges }));
+  }
+}
+
 async function api<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
   const { method = 'GET', body, token } = options;
 
@@ -45,7 +80,9 @@ async function api<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
     throw new Error(`${response.status}: ${errorMessage}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  emitNewBadges(data);
+  return data;
 }
 
 // Auth API

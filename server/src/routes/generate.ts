@@ -231,21 +231,29 @@ Top-p: ${input.topP || 'N/A'}
 `.trim();
 
   try {
+    const model = config.openai.model;
+    const payload: Record<string, unknown> = {
+      model,
+      messages: [{ role: 'user', content: payloadPrompt }],
+      response_format: { type: 'json_object' },
+    };
+
+    if (/^(gpt-5|o[1-9]|o\d)/i.test(model)) {
+      payload.reasoning_effort = config.openai.reasoningEffort;
+      payload.max_completion_tokens = 700;
+    } else {
+      payload.temperature = input.temperature ?? 0.85;
+      payload.top_p = input.topP ?? 0.95;
+      payload.max_tokens = 700;
+    }
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: config.openai.model,
-        messages: [{ role: 'user', content: payloadPrompt }],
-        reasoning_effort: config.openai.reasoningEffort,
-        temperature: input.temperature ?? 0.85,
-        top_p: input.topP ?? 0.95,
-        max_tokens: 700,
-        response_format: { type: 'json_object' },
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(120000),
     });
 
@@ -842,6 +850,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
               return lower.endsWith('.mp3') || lower.endsWith('.flac') || lower.endsWith('.wav');
             });
             const localPaths: string[] = [];
+            const newBadges: ReturnType<typeof recordPublishedSong> = [];
             const storage = getStorageProvider();
 
             for (let i = 0; i < audioUrls.length; i++) {
@@ -880,7 +889,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
                   ]
                 );
 
-                recordPublishedSong(req.user!.id, songId);
+                newBadges.push(...recordPublishedSong(req.user!.id, songId));
                 localPaths.push(storedPath);
               } catch (downloadError) {
                 console.error(`Failed to download audio ${i + 1}:`, downloadError);
@@ -906,12 +915,13 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
                     JSON.stringify(params),
                   ]
                 );
-                recordPublishedSong(req.user!.id, songId);
+                newBadges.push(...recordPublishedSong(req.user!.id, songId));
                 localPaths.push(audioUrl);
               }
             }
 
             aceStatus.result.audioUrls = localPaths;
+            aceStatus.result.newBadges = newBadges;
             cleanupJob(job.acestep_task_id);
           }
         }
@@ -924,6 +934,7 @@ router.get('/status/:jobId', authMiddleware, async (req: AuthenticatedRequest, r
           progress: aceStatus.progress,
           stage: aceStatus.stage,
           result: aceStatus.result,
+          newBadges: aceStatus.result?.newBadges || [],
           error: aceStatus.error,
         });
         return;

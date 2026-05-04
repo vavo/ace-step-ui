@@ -26,6 +26,10 @@ type LyricsDraft = {
   language: string;
 };
 
+function usesReasoningControls(model: string): boolean {
+  return /^(gpt-5|o[1-9]|o\d)/i.test(model);
+}
+
 function parseDraftJson(text: string): LyricsDraft | null {
   const first = text.indexOf('{');
   const last = text.lastIndexOf('}');
@@ -63,21 +67,29 @@ Mood: ${input.mood || 'auto'}
 Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on prompt'}
 `.trim();
 
+  const model = config.openai.model;
+  const payload: Record<string, unknown> = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+  };
+
+  if (usesReasoningControls(model)) {
+    payload.reasoning_effort = config.openai.reasoningEffort;
+    payload.max_completion_tokens = 900;
+  } else {
+    payload.temperature = 0.9;
+    payload.top_p = 0.95;
+    payload.max_tokens = 900;
+  }
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${config.openai.apiKey}`,
     },
-    body: JSON.stringify({
-      model: config.openai.model,
-      messages: [{ role: 'user', content: prompt }],
-      reasoning_effort: config.openai.reasoningEffort,
-      temperature: 0.9,
-      top_p: 0.95,
-      max_tokens: 900,
-      response_format: { type: 'json_object' },
-    }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(120_000),
   });
 
