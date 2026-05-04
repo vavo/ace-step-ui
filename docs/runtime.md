@@ -35,6 +35,20 @@ Open `http://localhost:3001`.
 
 If another process already owns port `3001`, stop it first or choose another `PORT` and update `FRONTEND_URL`, `PUBLIC_API_URL`, and `GOOGLE_OAUTH_CALLBACK_URL` to match.
 
+For RunPod proxy runtime on port `7777`:
+
+```bash
+export NODE_ENV=production
+export PORT=7777
+export FRONTEND_URL=https://your-7777.proxy.runpod.net
+export PUBLIC_API_URL=https://your-7777.proxy.runpod.net
+export GOOGLE_OAUTH_CALLBACK_URL=https://your-7777.proxy.runpod.net/api/auth/google/callback
+
+npm --prefix server start
+```
+
+Use the exact generated RunPod proxy host. Also register the exact Google callback URL in Google Cloud Console.
+
 ## Required Environment
 
 For local production-like runtime:

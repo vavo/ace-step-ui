@@ -224,6 +224,18 @@ Open `http://localhost:3001`.
 
 If the app is managed by a process manager, run the install/build steps, then restart that managed server process instead of starting a second one.
 
+For RunPod proxy runtime on port `7777`, set the public URL variables to the exact proxy host:
+
+```bash
+export NODE_ENV=production
+export PORT=7777
+export FRONTEND_URL=https://your-7777.proxy.runpod.net
+export PUBLIC_API_URL=https://your-7777.proxy.runpod.net
+export GOOGLE_OAUTH_CALLBACK_URL=https://your-7777.proxy.runpod.net/api/auth/google/callback
+
+npm --prefix server start
+```
+
 ### Required production env
 
 For a local production-like run:
