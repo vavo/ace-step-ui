@@ -292,6 +292,8 @@ function AppContent() {
       window.history.pushState({}, '', '/leaderboard');
     } else if (view === 'search') {
       window.history.pushState({}, '', '/search');
+    } else if (view === 'training') {
+      window.history.pushState({}, '', '/training');
     }
   }, []);
 
@@ -344,6 +346,8 @@ function AppContent() {
         setCurrentView('ideas');
       } else if (path === '/leaderboard') {
         setCurrentView('leaderboard');
+      } else if (path === '/training') {
+        setCurrentView('training');
       } else if (path.startsWith('/@')) {
         const username = path.substring(2);
         if (username) {

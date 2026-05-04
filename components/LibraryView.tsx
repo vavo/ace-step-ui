@@ -373,7 +373,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 <button
                                     className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-500 hover:text-red-600 transition-colors"
                                     onClick={() => onDeleteReferenceTrack?.(track.id)}
-                                    title="Delete upload"
+                                    title={t('deleteUpload')}
                                 >
                                     <Trash2 size={16} />
                                 </button>

@@ -185,7 +185,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [audioCodes, setAudioCodes] = useState('');
   const [repaintingStart, setRepaintingStart] = useState(0);
   const [repaintingEnd, setRepaintingEnd] = useState(-1);
-  const [instruction, setInstruction] = useState('Fill the audio semantic mask based on the given conditions:');
+  const [instruction, setInstruction] = useState(t('semanticMaskInstruction'));
   const [audioCoverStrength, setAudioCoverStrength] = useState(1.0);
   const [taskType, setTaskType] = useState('text2music');
   const [useAdg, setUseAdg] = useState(false);
@@ -204,6 +204,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [lmBatchChunkSize, setLmBatchChunkSize] = useState(8);
   const [trackName, setTrackName] = useState('');
   const [completeTrackClasses, setCompleteTrackClasses] = useState('');
+  const formatTrackName = (name: string) => t(`track_${name}` as any);
   const [isFormatCaption, setIsFormatCaption] = useState(false);
   const [maxDurationWithLm, setMaxDurationWithLm] = useState(240);
   const [maxDurationWithoutLm, setMaxDurationWithoutLm] = useState(240);
@@ -1369,7 +1370,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                         console.error('Failed to load random description:', err);
                       }
                     }}
-                    title="Load random description"
+                    title={t('loadRandomDescription')}
                     className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors"
                   >
                     <Dices size={14} />
@@ -1917,7 +1918,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             {/* Load Parameters from JSON */}
             <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-zinc-300 dark:border-white/15 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors">
               <Upload size={14} />
-              Load Parameters (JSON)
+              {t('loadParametersJson')}
               <input
                 type="file"
                 accept=".json"
@@ -2275,10 +2276,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     console.log('Convert to Codes: requires source audio upload. Use Gradio UI for this feature.');
                   }}
                   disabled={!sourceAudioUrl}
-                  title="Convert source audio to LM codes (requires source audio)"
+                  title={t('convertToCodesTitle')}
                   className="px-2 py-1 rounded text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Convert to Codes
+                  {t('convertToCodes')}
                 </button>
                 <button
                   type="button"
@@ -2287,10 +2288,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     console.log('Transcribe: requires audio codes. Use Gradio UI for this feature.');
                   }}
                   disabled={!audioCodes.trim()}
-                  title="Transcribe audio codes to metadata (requires audio codes)"
+                  title={t('transcribeCodesTitle')}
                   className="px-2 py-1 rounded text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Transcribe
+                  {t('transcribe')}
                 </button>
               </div>
             </div>
@@ -2431,9 +2432,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                 onChange={(e) => setTrackName(e.target.value)}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none cursor-pointer [&>option]:bg-white [&>option]:dark:bg-zinc-800"
               >
-                <option value="">None</option>
+                <option value="">{t('none')}</option>
                 {TRACK_NAMES.map(name => (
-                  <option key={name} value={name}>{name}</option>
+                  <option key={name} value={name}>{formatTrackName(name)}</option>
                 ))}
               </select>
             </div>
@@ -2457,7 +2458,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                         }}
                         className="accent-pink-600"
                       />
-                      {name}
+                      {formatTrackName(name)}
                     </label>
                   );
                 })}

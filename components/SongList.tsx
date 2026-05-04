@@ -222,9 +222,9 @@ export const SongList: React.FC<SongListProps> = ({
                 {/* Header */}
                 <div className="flex flex-col gap-6 mb-8">
                     <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        <span className="hover:text-black dark:hover:text-white cursor-pointer transition-colors">Workspaces</span>
+                        <span className="hover:text-black dark:hover:text-white cursor-pointer transition-colors">{t('workspaces')}</span>
                         <span className="text-zinc-400 dark:text-zinc-600">›</span>
-                        <span className="text-zinc-900 dark:text-white font-medium">My Workspace</span>
+                        <span className="text-zinc-900 dark:text-white font-medium">{t('myWorkspace')}</span>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -297,14 +297,14 @@ export const SongList: React.FC<SongListProps> = ({
                                     : 'bg-zinc-100 dark:bg-[#121214] hover:bg-zinc-200 dark:hover:bg-white/5 border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-white'
                                 }`}
                         >
-                            Select
+                            {t('select')}
                         </button>
                     </div>
 
                     {isSelecting && (
                         <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3">
                             <div className="text-sm text-zinc-600 dark:text-zinc-300">
-                                {selectedSongs.length} selected
+                                {t('selectedCount').replace('{count}', String(selectedSongs.length))}
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
@@ -317,7 +317,7 @@ export const SongList: React.FC<SongListProps> = ({
                                     }}
                                     className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20"
                                 >
-                                    {allSelected ? 'Clear all' : 'Select all'}
+                                    {allSelected ? t('clearAll') : t('selectAll')}
                                 </button>
                                 <button
                                     onClick={() => {
@@ -332,7 +332,7 @@ export const SongList: React.FC<SongListProps> = ({
                                         }`}
                                     disabled={!selectedSongs.length}
                                 >
-                                    Delete
+                                    {t('delete')}
                                 </button>
                             </div>
                         </div>

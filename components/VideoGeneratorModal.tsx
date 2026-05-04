@@ -4,6 +4,7 @@ import { X, Play, Pause, Download, Wand2, Image as ImageIcon, Music, Video, Load
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { useResponsive } from '../context/ResponsiveContext';
+import { useI18n } from '../context/I18nContext';
 
 interface VideoGeneratorModalProps {
   isOpen: boolean;
@@ -103,6 +104,7 @@ function ColumnsIcon() {
 
 export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen, onClose, song }) => {
   const { isMobile } = useResponsive();
+  const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number>(0);
@@ -1714,7 +1716,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
             <div className="absolute top-0 left-0 right-0 z-10 p-3 bg-gradient-to-b from-black/80 to-transparent">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Video className="text-pink-500" size={18} />
-                Video Studio
+                {t('videoStudio')}
               </h2>
             </div>
 
@@ -1748,19 +1750,19 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
               <div className="p-6 border-b border-white/5">
                   <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
                       <Video className="text-pink-500" size={20} />
-                      Video Studio
+                      {t('videoStudio')}
                   </h2>
-                  <p className="text-zinc-500 text-xs">Create professional visualizers.</p>
+                  <p className="text-zinc-500 text-xs">{t('videoStudioSubtitle')}</p>
               </div>
             )}
 
             {/* Tabs */}
             <div className="flex border-b border-white/5">
                 {[
-                    { id: 'presets', label: 'Presets', icon: <Grid size={14} /> },
-                    { id: 'style', label: 'Style', icon: <Palette size={14} /> },
-                    { id: 'text', label: 'Text', icon: <Type size={14} /> },
-                    { id: 'effects', label: 'FX', icon: <Zap size={14} /> }
+                    { id: 'presets', label: t('presets'), icon: <Grid size={14} /> },
+                    { id: 'style', label: t('styleTab'), icon: <Palette size={14} /> },
+                    { id: 'text', label: t('textTab'), icon: <Type size={14} /> },
+                    { id: 'effects', label: t('effectsTab'), icon: <Zap size={14} /> }
                 ].map(tab => (
                     <button 
                         key={tab.id}
@@ -1912,7 +1914,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
 
                          {/* Colors */}
                          <div className="space-y-3">
-                             <label className="text-xs font-bold text-zinc-500 uppercase">Color Presets</label>
+                             <label className="text-xs font-bold text-zinc-500 uppercase">{t('colorPresets')}</label>
                              <div className="grid grid-cols-5 gap-2">
                                  {[
                                      { name: 'Neon Pink', primary: '#ec4899', secondary: '#8b5cf6' },
@@ -2085,19 +2087,19 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                 {activeTab === 'effects' && (
                     <div className="space-y-2">
                         {[
-                            { id: 'shake', label: 'Bass Shake', desc: 'Camera reacts to low freq', icon: <Activity size={16}/> },
-                            { id: 'glitch', label: 'Digital Glitch', desc: 'Random artifacting', icon: <Zap size={16}/> },
-                            { id: 'vhs', label: 'VHS Tape', desc: 'Color bleeding & noise', icon: <Disc size={16}/> },
-                            { id: 'cctv', label: 'CCTV Mode', desc: 'Night vision style', icon: <Monitor size={16}/> },
-                            { id: 'scanlines', label: 'Scanlines', desc: 'Old monitor effect', icon: <Grid size={16}/> },
-                            { id: 'chromatic', label: 'Aberration', desc: 'RGB Split', icon: <Layers size={16}/> },
-                            { id: 'bloom', label: 'Bloom', desc: 'Glow on bright areas', icon: <Sun size={16}/> },
-                            { id: 'filmGrain', label: 'Film Grain', desc: 'Cinematic noise', icon: <Film size={16}/> },
-                            { id: 'pixelate', label: 'Pixelate', desc: 'Retro pixel look', icon: <Grid size={16}/> },
-                            { id: 'strobe', label: 'Strobe', desc: 'Flash on bass hits', icon: <Zap size={16}/> },
-                            { id: 'vignette', label: 'Vignette', desc: 'Dark edges', icon: <Circle size={16}/> },
-                            { id: 'hueShift', label: 'Hue Shift', desc: 'Color rotation', icon: <Palette size={16}/> },
-                            { id: 'letterbox', label: 'Letterbox', desc: 'Cinematic bars', icon: <Minus size={16}/> },
+                            { id: 'shake', label: t('effectBassShake'), desc: t('effectBassShakeDesc'), icon: <Activity size={16}/> },
+                            { id: 'glitch', label: t('effectDigitalGlitch'), desc: t('effectDigitalGlitchDesc'), icon: <Zap size={16}/> },
+                            { id: 'vhs', label: t('effectVhsTape'), desc: t('effectVhsTapeDesc'), icon: <Disc size={16}/> },
+                            { id: 'cctv', label: t('effectCctvMode'), desc: t('effectCctvModeDesc'), icon: <Monitor size={16}/> },
+                            { id: 'scanlines', label: t('effectScanlines'), desc: t('effectScanlinesDesc'), icon: <Grid size={16}/> },
+                            { id: 'chromatic', label: t('effectAberration'), desc: t('effectAberrationDesc'), icon: <Layers size={16}/> },
+                            { id: 'bloom', label: t('effectBloom'), desc: t('effectBloomDesc'), icon: <Sun size={16}/> },
+                            { id: 'filmGrain', label: t('effectFilmGrain'), desc: t('effectFilmGrainDesc'), icon: <Film size={16}/> },
+                            { id: 'pixelate', label: t('effectPixelate'), desc: t('effectPixelateDesc'), icon: <Grid size={16}/> },
+                            { id: 'strobe', label: t('effectStrobe'), desc: t('effectStrobeDesc'), icon: <Zap size={16}/> },
+                            { id: 'vignette', label: t('effectVignette'), desc: t('effectVignetteDesc'), icon: <Circle size={16}/> },
+                            { id: 'hueShift', label: t('effectHueShift'), desc: t('effectHueShiftDesc'), icon: <Palette size={16}/> },
+                            { id: 'letterbox', label: t('effectLetterbox'), desc: t('effectLetterboxDesc'), icon: <Minus size={16}/> },
                         ].map((effect) => {
                              const effectId = effect.id as keyof EffectConfig;
                              const isActive = effects[effectId];
@@ -2125,7 +2127,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                                     {isActive && (
                                         <div className="px-3 pb-3 pt-0 animate-in fade-in slide-in-from-top-2">
                                             <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
-                                                <span>Intensity</span>
+                                                <span>{t('intensity')}</span>
                                                 <span>{Math.round(intensity * 100)}%</span>
                                             </div>
                                             <input 
@@ -2180,11 +2182,11 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                         className="w-full h-12 bg-white text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:scale-105 transition-transform disabled:opacity-50"
                     >
                         <Download size={18} />
-                        Render Video (MP4)
+                        {t('renderVideoMp4')}
                     </button>
                  )}
                  <p className="text-[10px] text-zinc-600 text-center">
-                   {ffmpegLoaded ? 'Encoder ready • ' : ''}Offline rendering - faster than real-time.
+                   {ffmpegLoaded ? `${t('encoderReady')} • ` : ''}{t('offlineRendering')}
                  </p>
             </div>
         </div>
@@ -2226,10 +2228,10 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                 </div>
                 <div>
                   <h3 className="text-white font-bold">
-                    {pexelsTarget === 'albumArt' ? 'Select Center Image' : 'Select Background'}
+                    {pexelsTarget === 'albumArt' ? t('selectCenterImage') : t('selectBackground')}
                   </h3>
                   <p className="text-zinc-500 text-xs">
-                    {pexelsTarget === 'albumArt' ? 'Choose an image for the center circle' : 'Free stock photos & videos'}
+                    {pexelsTarget === 'albumArt' ? t('chooseCenterImage') : t('freeStockPhotosVideos')}
                   </p>
                 </div>
               </div>
@@ -2361,7 +2363,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                     >
                       <img src={photo.src.large} alt="" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white text-xs font-bold bg-emerald-600 px-3 py-1 rounded-full">Select</span>
+                        <span className="text-white text-xs font-bold bg-emerald-600 px-3 py-1 rounded-full">{t('select')}</span>
                       </div>
                       <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                         <p className="text-[10px] text-zinc-300 truncate">by {photo.photographer}</p>
@@ -2382,7 +2384,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                         <Video size={10} className="inline mr-1" />VIDEO
                       </div>
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white text-xs font-bold bg-emerald-600 px-3 py-1 rounded-full">Select</span>
+                        <span className="text-white text-xs font-bold bg-emerald-600 px-3 py-1 rounded-full">{t('select')}</span>
                       </div>
                       <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                         <p className="text-[10px] text-zinc-300 truncate">by {video.user.name}</p>
