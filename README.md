@@ -249,7 +249,7 @@ GOOGLE_OAUTH_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-5.5
 FORMAT_PROVIDER=openai
 JWT_SECRET=replace_with_a_long_random_secret
 ```
