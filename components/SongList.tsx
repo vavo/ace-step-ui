@@ -467,6 +467,7 @@ const SongItem: React.FC<SongItemProps> = ({
     onCoverSong
 }) => {
     const { token } = useAuth();
+    const { t } = useI18n();
     const [showDropdown, setShowDropdown] = useState(false);
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [imageError, setImageError] = useState(false);
