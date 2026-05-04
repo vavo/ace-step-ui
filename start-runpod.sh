@@ -32,14 +32,27 @@ if [ ! -d "server/node_modules" ]; then
     exit 1
 fi
 
-# Check if dist exists (production build)
-if [ ! -d "dist" ]; then
-    echo "Warning: Production build not found in dist/"
-    echo "Run: npm run build"
-    echo "Continuing in development mode..."
+RUN_MODE="${RUN_MODE:-production}"
+SERVER_NPM_SCRIPT="start"
+
+if [ "$RUN_MODE" = "development" ]; then
+    echo "Development mode requested via RUN_MODE=development"
     export NODE_ENV=development
+    SERVER_NPM_SCRIPT="dev"
 else
-    echo "Production build found in dist/"
+    if [ ! -d "dist" ]; then
+        echo "Error: Frontend production build not found in dist/"
+        echo "Run: npm run build"
+        exit 1
+    fi
+
+    if [ ! -f "server/dist/index.js" ]; then
+        echo "Error: Server production build not found in server/dist/"
+        echo "Run: npm --prefix server run build"
+        exit 1
+    fi
+
+    echo "Production builds found in dist/ and server/dist/"
     export NODE_ENV=production
 fi
 
@@ -92,7 +105,7 @@ fi
 # Start Express on configured external port
 echo "[2/2] Starting Express server on port ${PORT} (external)..."
 cd server
-NODE_ENV="${NODE_ENV}" PORT="${PORT}" npm run dev > ../logs/express.log 2>&1 &
+NODE_ENV="${NODE_ENV}" PORT="${PORT}" npm run "${SERVER_NPM_SCRIPT}" > ../logs/express.log 2>&1 &
 EXPRESS_PID=$!
 cd ..
 
