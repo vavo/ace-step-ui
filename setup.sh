@@ -50,6 +50,7 @@ DATABASE_PATH=./data/acestep.db
 
 # ACE-Step API and local checkout
 ACESTEP_API_URL=http://localhost:8001
+ACESTEP_GRADIO_URL=
 ACESTEP_PATH=$ACESTEP_PATH
 
 # Storage

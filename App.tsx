@@ -54,6 +54,7 @@ function AppContent() {
 
   // Content State
   const [songs, setSongs] = useState<Song[]>([]);
+  const [librarySongs, setLibrarySongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [likedSongIds, setLikedSongIds] = useState<Set<string>>(new Set());
   const [referenceTracks, setReferenceTracks] = useState<ReferenceTrack[]>([]);
@@ -411,6 +412,8 @@ function AppContent() {
 
         const mySongs = mySongsRes.songs.map(mapSong);
         const likedSongs = likedSongsRes.songs.map(mapSong);
+
+        setLibrarySongs(mySongs);
 
         const songsMap = new Map<string, Song>();
         [...mySongs, ...likedSongs].forEach(s => songsMap.set(s.id, s));
@@ -791,6 +794,8 @@ function AppContent() {
           }
         })(),
       }));
+
+      setLibrarySongs(loadedSongs);
 
       // Preserve any generating songs that aren't in the loaded list
       setSongs(prev => {
@@ -1181,6 +1186,7 @@ function AppContent() {
 
         if (succeeded.length > 0) {
           setSongs(prev => prev.filter(s => !idsToDelete.has(s.id) || failed.includes(s.id)));
+          setLibrarySongs(prev => prev.filter(s => !idsToDelete.has(s.id) || failed.includes(s.id)));
 
           setLikedSongIds(prev => {
             const next = new Set(prev);
@@ -1346,10 +1352,9 @@ function AppContent() {
   const renderContent = () => {
     switch (currentView) {
       case 'library': {
-        const allSongs = user ? songs.filter(s => s.userId === user.id) : [];
         return (
           <LibraryView
-            allSongs={allSongs}
+            allSongs={librarySongs}
             likedSongs={songs.filter(s => likedSongIds.has(s.id))}
             playlists={playlists}
             referenceTracks={referenceTracks}

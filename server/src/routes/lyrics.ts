@@ -26,8 +26,78 @@ type LyricsDraft = {
   language: string;
 };
 
+const LANGUAGE_ALIASES: Array<{ code: string; aliases: string[] }> = [
+  { code: 'sk', aliases: ['sk', 'slovak', 'slovensky', 'slovencina', 'slovencine', 'po slovensky', 'v slovencine'] },
+  { code: 'cs', aliases: ['cs', 'cz', 'czech', 'cesky', 'cestina', 'cestine', 'po cesky', 'v cestine'] },
+  { code: 'en', aliases: ['en', 'english', 'anglicky', 'anglictina', 'anglictine', 'po anglicky', 'in english'] },
+  { code: 'de', aliases: ['de', 'german', 'deutsch', 'nemecky', 'nemcina', 'nemcine', 'po nemecky'] },
+  { code: 'fr', aliases: ['fr', 'french', 'francais', 'francuzsky', 'francuzstina', 'francuzstine'] },
+  { code: 'es', aliases: ['es', 'spanish', 'espanol', 'spanielsky', 'spanielcina', 'spanielcine'] },
+  { code: 'it', aliases: ['it', 'italian', 'taliansky', 'taliancina', 'taliancine'] },
+  { code: 'pl', aliases: ['pl', 'polish', 'polsky', 'polstina', 'polstine'] },
+  { code: 'hu', aliases: ['hu', 'hungarian', 'madarsky', 'madarcina', 'madarcine'] },
+  { code: 'uk', aliases: ['uk', 'ukrainian', 'ukrajinsky', 'ukrajincina', 'ukrajincine'] },
+  { code: 'ro', aliases: ['ro', 'romanian', 'rumunsky', 'rumuncina', 'rumuncine'] },
+  { code: 'nl', aliases: ['nl', 'dutch', 'nederlands', 'holandsky', 'holandcina', 'holandcine'] },
+  { code: 'pt', aliases: ['pt', 'portuguese', 'portugalsky', 'portugalcina', 'portugalcine'] },
+  { code: 'sv', aliases: ['sv', 'swedish', 'svedsky', 'svedcina', 'svedcine'] },
+  { code: 'no', aliases: ['no', 'norwegian', 'norsky', 'norcina', 'norcine'] },
+  { code: 'da', aliases: ['da', 'danish', 'dansky', 'dancina', 'dancine'] },
+  { code: 'fi', aliases: ['fi', 'finnish', 'finsky', 'fincina', 'fincine'] },
+  { code: 'el', aliases: ['el', 'greek', 'grecky', 'grecina', 'grecine'] },
+  { code: 'tr', aliases: ['tr', 'turkish', 'turecky', 'turectina', 'turectine'] },
+  { code: 'hr', aliases: ['hr', 'croatian', 'chorvatsky', 'chorvatcina', 'chorvatcine'] },
+  { code: 'sr', aliases: ['sr', 'serbian', 'srbsky', 'srbcina', 'srbcine'] },
+  { code: 'sl', aliases: ['sl', 'slovenian', 'slovinsky', 'slovincina', 'slovincine'] },
+  { code: 'bg', aliases: ['bg', 'bulgarian', 'bulharsky', 'bulharcina', 'bulharcine'] },
+  { code: 'ru', aliases: ['ru', 'russian', 'rusky', 'rustina', 'rustine'] },
+];
+
 function usesReasoningControls(model: string): boolean {
   return /\b(gpt-5|o[1-9]|o\d)/i.test(model);
+}
+
+function normalizeLanguageText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasLanguageAlias(haystack: string, alias: string): boolean {
+  const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escapedAlias}([^a-z0-9]|$)`).test(haystack);
+}
+
+function normalizeLanguageCode(value: string): string | null {
+  const normalized = normalizeLanguageText(value);
+  if (!normalized || normalized === 'auto' || normalized === 'unknown') return null;
+
+  const codeMatch = normalized.match(/^[a-z]{2,3}(?:-[a-z]{2})?$/);
+  if (codeMatch) return normalized.slice(0, 2);
+
+  for (const language of LANGUAGE_ALIASES) {
+    if (language.aliases.some(alias => hasLanguageAlias(normalized, alias))) {
+      return language.code;
+    }
+  }
+
+  return null;
+}
+
+function resolveLyricsLanguageCode(input: Required<LyricsDraftBody>): string {
+  const requestText = normalizeLanguageText([input.prompt, input.mood, input.style].filter(Boolean).join(' '));
+
+  for (const language of LANGUAGE_ALIASES) {
+    if (language.aliases.some(alias => hasLanguageAlias(requestText, alias))) {
+      return language.code;
+    }
+  }
+
+  return normalizeLanguageCode(input.language) || 'sk';
 }
 
 function toDraftString(value: unknown): string {
@@ -75,18 +145,14 @@ async function draftLyricsWithOpenAI(input: Required<LyricsDraftBody>): Promise<
     throw new Error('OpenAI API key is not configured');
   }
 
-  const prompt = `
-You write catchy song drafts.
-Return ONLY JSON with keys: title, lyrics, stylePrompt, language.
-Language must be "${input.language}" unless the user prompt clearly asks for another language.
-Lyrics must include section labels like [Verse] and [Chorus] in the language of generated lyrics.
-Keep the lyrics original, memorable, singable, emotionally direct, and suitable for 18+ audiences unless specified by the user.
-Do not mention that you are an AI.
-
-User prompt: ${input.prompt}
-Mood: ${input.mood || 'auto'}
-Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on prompt'}
-`.trim();
+  const languageCode = resolveLyricsLanguageCode(input);
+  const fallbackInput = { ...input, language: languageCode };
+  const systemPrompt = `You write catchy song drafts. Return ONLY JSON with exactly these keys: title, lyrics, stylePrompt, language. Language must be "${languageCode}" unless the user's request explicitly asks for another language. Lyrics must include at least two section labels, such as [Verse] and [Chorus], written in the language of the generated lyrics. Keep the lyrics original, memorable, singable, emotionally direct, and suitable for 18+ audiences unless specified by the user. Make stylePrompt concise, vivid, and production-oriented so it clearly guides the music model's genre, mood, tempo, instrumentation, and vocal style. Do not mention that you are an AI.`;
+  const userPrompt = [
+    `User request: ${input.prompt}`,
+    `Mood: ${input.mood || 'auto'}`,
+    `Style: ${input.style || 'auto'}`,
+  ].join('\n');
 
   const model = config.openai.model;
   const payload: Record<string, unknown> = {
@@ -94,9 +160,9 @@ Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on pr
     messages: [
       {
         role: 'system',
-        content: 'Return only valid JSON. Required keys: title, lyrics, stylePrompt, language. The lyrics value must be a non-empty string.',
+        content: systemPrompt,
       },
-      { role: 'user', content: prompt },
+      { role: 'user', content: userPrompt },
     ],
     response_format: { type: 'json_object' },
   };
@@ -155,7 +221,7 @@ Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on pr
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   };
   const rawText = responseJson.choices?.[0]?.message?.content ?? '';
-  const draft = parseDraftJson(rawText, input);
+  const draft = parseDraftJson(rawText, fallbackInput);
   if (!draft) {
     console.error('[Lyrics] Invalid draft response:', {
       finishReason: responseJson.choices?.[0]?.finish_reason,

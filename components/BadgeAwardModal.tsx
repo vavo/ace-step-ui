@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sparkles, Trophy, X } from 'lucide-react';
 import { UserBadge } from '../services/api';
+import { useI18n } from '../context/I18nContext';
 
 interface BadgeAwardModalProps {
   badge: UserBadge | null;
@@ -15,9 +16,16 @@ const colorClasses: Record<string, string> = {
 };
 
 export const BadgeAwardModal: React.FC<BadgeAwardModalProps> = ({ badge, onClose }) => {
+  const { t } = useI18n();
+
   if (!badge) return null;
 
   const badgeColor = colorClasses[badge.color] || colorClasses.blue;
+  const badgeKey = badge.badge_key || badge.id;
+  const translatedLabel = t(`badge_${badgeKey}_label`);
+  const translatedDescription = t(`badge_${badgeKey}_description`);
+  const badgeLabel = translatedLabel.startsWith('badge_') ? badge.label : translatedLabel;
+  const badgeDescription = translatedDescription.startsWith('badge_') ? badge.description : translatedDescription;
 
   return (
     <div
@@ -44,28 +52,28 @@ export const BadgeAwardModal: React.FC<BadgeAwardModalProps> = ({ badge, onClose
           </div>
 
           <p className="text-xs font-bold uppercase tracking-[0.28em] text-pink-300">
-            Congratulations
+            {t('badgeModalCongratulations')}
           </p>
           <h2 className="mt-2 text-2xl font-black text-white">
-            New badge unlocked
+            {t('badgeModalTitle')}
           </h2>
 
           <div className={`mx-auto my-6 flex min-h-32 w-32 flex-col items-center justify-center rounded-full bg-gradient-to-br ${badgeColor} p-4 shadow-2xl`}>
             <Trophy size={34} className="mb-2" />
             <span className="text-center text-sm font-black leading-tight">
-              {badge.label}
+              {badgeLabel}
             </span>
           </div>
 
           <p className="mx-auto max-w-xs text-sm leading-relaxed text-zinc-300">
-            {badge.description}
+            {badgeDescription}
           </p>
 
           <button
             onClick={onClose}
             className="mt-6 w-full rounded-full bg-white px-5 py-3 text-sm font-black text-zinc-950 transition-transform hover:scale-[1.02] active:scale-[0.98]"
           >
-            Nice
+            {t('badgeModalClose')}
           </button>
         </div>
       </div>

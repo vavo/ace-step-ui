@@ -20,7 +20,7 @@ function getAudioDuration(filePath: string): number {
 }
 import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
-import { getGradioClient, resetGradioClient, isGradioAvailable } from './gradio-client.js';
+import { getGradioClient, resetGradioClient, isAceStepApiAvailable, isGradioAvailable } from './gradio-client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -373,9 +373,9 @@ setInterval(() => cleanupOldJobs(3600000), 600000);
 const jobQueue: string[] = [];
 let isProcessingQueue = false;
 
-// Health check - verify Gradio app is reachable
+// Health check - verify the ACE-Step API is reachable.
 export async function checkSpaceHealth(): Promise<boolean> {
-  return isGradioAvailable();
+  return (await isAceStepApiAvailable()) || (await isGradioAvailable());
 }
 
 // ---------------------------------------------------------------------------

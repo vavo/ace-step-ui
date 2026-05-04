@@ -24,6 +24,7 @@ export const config = {
   // ACE-Step API (local)
   acestep: {
     apiUrl: process.env.ACESTEP_API_URL || 'http://localhost:8001',
+    gradioUrl: process.env.ACESTEP_GRADIO_URL || '',
   },
 
   // Pexels (optional - for video backgrounds)
