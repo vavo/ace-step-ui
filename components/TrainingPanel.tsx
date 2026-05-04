@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   Database, Play, Square, Download, FolderOpen, Save, Loader2, Music2,
   Edit3, Upload, X, Volume2, FileAudio, ChevronRight, Zap, Search,
-  Cpu, Wand2, Settings, RefreshCw,
+  Cpu, Wand2, Settings, RefreshCw, Lock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
@@ -46,8 +46,10 @@ const PIPELINE_STEPS = [
 type PipelineStepKey = typeof PIPELINE_STEPS[number]['key'];
 
 export const TrainingPanel: React.FC = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { t } = useI18n();
+  const userPlan = (user?.accountTier || user?.plan || 'free').toLowerCase();
+  const canUseLoraTraining = Boolean(user?.isAdmin || user?.unlimitedCredits || userPlan !== 'free');
 
   const [activeTab, setActiveTab] = useState<TrainingTab>('dataset');
 
@@ -637,7 +639,19 @@ export const TrainingPanel: React.FC = () => {
   ];
 
   return (
-    <div className="h-full w-full flex flex-col bg-zinc-50 dark:bg-suno-panel overflow-hidden">
+    <div className="relative h-full w-full flex flex-col bg-zinc-50 dark:bg-suno-panel overflow-hidden">
+      {!canUseLoraTraining && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-zinc-950/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-zinc-950/95 p-6 text-center shadow-2xl shadow-black/40">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/15 text-pink-300 ring-1 ring-pink-500/30">
+              <Lock size={22} />
+            </div>
+            <h3 className="text-base font-bold text-white">Only available for subscribers.</h3>
+            <p className="mt-2 text-sm text-zinc-400">Coming soon.</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-4 pt-4 pb-2 flex-shrink-0">
         <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t('loraTraining')}</h2>

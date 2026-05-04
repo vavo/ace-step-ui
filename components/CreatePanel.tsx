@@ -205,6 +205,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [loraScale, setLoraScale] = useState(1.0);
   const [loraError, setLoraError] = useState<string | null>(null);
   const [isLoraLoading, setIsLoraLoading] = useState(false);
+  const userPlan = (user?.accountTier || user?.plan || 'free').toLowerCase();
+  const canUseLora = Boolean(user?.isAdmin || user?.unlimitedCredits || userPlan !== 'free');
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
@@ -398,6 +400,15 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     previousModelRef.current = selectedModel;
   }, [selectedModel, loraLoaded]);
 
+  useEffect(() => {
+    if (!canUseLora) {
+      setShowLoraPanel(false);
+      setLoraLoaded(false);
+      setLoraEnabled(false);
+      setLoraError(null);
+    }
+  }, [canUseLora]);
+
   // Auto-disable thinking and ADG when LoRA is loaded
   useEffect(() => {
     if (loraLoaded) {
@@ -408,6 +419,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // LoRA API handlers
   const handleLoraToggle = async () => {
+    if (!canUseLora) return;
     if (!token) {
       setLoraError('Please sign in to use LoRA');
       return;
@@ -438,7 +450,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   };
 
   const handleLoraUnload = async () => {
-    if (!token) return;
+    if (!canUseLora || !token) return;
     
     setIsLoraLoading(true);
     setLoraError(null);
@@ -459,7 +471,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const handleLoraScaleChange = async (newScale: number) => {
     setLoraScale(newScale);
 
-    if (!token || !loraLoaded) return;
+    if (!canUseLora || !token || !loraLoaded) return;
 
     try {
       await generateApi.setLoraScale({ scale: newScale }, token);
@@ -469,7 +481,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   };
 
   const handleLoraEnabledToggle = async () => {
-    if (!token || !loraLoaded) return;
+    if (!canUseLora || !token || !loraLoaded) return;
     const newEnabled = !loraEnabled;
     setLoraEnabled(newEnabled);
     try {
@@ -1785,7 +1797,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         </div>
 
         {/* LORA CONTROL PANEL */}
-        {customMode && (
+        {customMode && canUseLora && (
           <>
             <button
               onClick={() => setShowLoraPanel(!showLoraPanel)}
