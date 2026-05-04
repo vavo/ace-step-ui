@@ -207,16 +207,21 @@ function parseGeminiJson(text: string): GeminiFormatResult | null {
   }
 }
 
-async function formatWithOpenAI(input: GeminiFormatInput): Promise<GeminiFormatResult | null> {
-  const apiKey = config.openai.apiKey;
-  if (!apiKey) return null;
-
-  const payloadPrompt = `
-Improve the provided music prompt for ACE-Step style/lyrics formatting.
+function buildFormatPrompt(input: GeminiFormatInput): string {
+  return `
+You improve ACE-Step music generation prompts.
 Return ONLY JSON with keys: caption, lyrics, bpm, duration, key_scale, time_signature, vocal_language.
-Use "caption" for improved style prompt text.
-Use "lyrics" for polished lyrics (if provided).
-Return numbers for bpm/duration when possible.
+
+Hard rules:
+- Preserve the user's explicit genre, style, language, vocal gender, mood, and instrumentation.
+- Do not replace the requested genre with another genre.
+- Do not turn a vocal song request into an instrumental unless the user explicitly asks for instrumental.
+- If the user asks for Slovak / slovenský / slovenčina / slovencine, set vocal_language to "sk" and keep the caption asking for Slovak vocals.
+- If the user asks for jungle, keep jungle / drum and bass in the caption.
+- If the user asks for female vocals / ženský vokál / zenskym vokalom, keep female vocals in the caption.
+- If lyrics are provided, polish them without changing their language or meaning.
+- If lyrics are not provided, do not invent a full unrelated narrative; only improve the style caption.
+- Return reasonable bpm/duration only when implied by the genre or request.
 
 Input:
 Caption: ${input.caption}
@@ -229,6 +234,13 @@ Temperature: ${input.temperature ?? 0.85}
 Top-k: ${input.topK || 'N/A'}
 Top-p: ${input.topP || 'N/A'}
 `.trim();
+}
+
+async function formatWithOpenAI(input: GeminiFormatInput): Promise<GeminiFormatResult | null> {
+  const apiKey = config.openai.apiKey;
+  if (!apiKey) return null;
+
+  const payloadPrompt = buildFormatPrompt(input);
 
   try {
     const model = config.openai.model;
@@ -317,24 +329,7 @@ async function formatWithGemini(input: GeminiFormatInput): Promise<GeminiFormatR
   const apiKey = config.gemini.apiKey;
   if (!apiKey) return null;
 
-  const payloadPrompt = `
-Improve the provided music prompt for ACE-Step style/lyrics formatting.
-Return ONLY JSON with keys: caption, lyrics, bpm, duration, key_scale, time_signature, vocal_language.
-Use "caption" for improved style prompt text.
-Use "lyrics" for polished lyrics (if provided).
-Return numbers for bpm/duration when possible.
-
-Input:
-Caption: ${input.caption}
-Lyrics: ${input.lyrics || 'N/A'}
-Requested BPM: ${input.bpm || 'N/A'}
-Requested Duration: ${input.duration || 'N/A'}
-Key: ${input.keyScale || 'N/A'}
-Time signature: ${input.timeSignature || 'N/A'}
-Temperature: ${input.temperature ?? 0.85}
-Top-k: ${input.topK || 'N/A'}
-Top-p: ${input.topP || 'N/A'}
-  `.trim();
+  const payloadPrompt = buildFormatPrompt(input);
 
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
