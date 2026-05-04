@@ -618,6 +618,8 @@ const enTranslations: TranslationBundle = {
     // Training Module
     loraTraining: 'LoRA Training',
     trainingDescription: 'Build datasets from your audio files and train custom LoRA adapters',
+    subscriberOnly: 'Only available for subscribers.',
+    comingSoon: 'Coming soon.',
     datasetBuilder: 'Dataset Builder',
     trainLora: 'Train LoRA',
     quickStart: 'Quick Start',
@@ -2727,6 +2729,8 @@ export const translations: Record<string, TranslationBundle> = {
     uploadAudioFilesAsReferences: 'Nahrať zvukové súbory ako referencie',
     loraTraining: 'Tréning LoRA',
     trainingDescription: 'Vytvor datasety zo svojich zvukov a trénuj LoRA adaptéry',
+    subscriberOnly: 'Len pre predplatiteľov.',
+    comingSoon: 'Už čoskoro. Áno, tá najobľúbenejšia fráza produktového vývoja.',
     datasetBuilder: 'Tvorba datasetu',
     trainLora: 'Trénovať LoRA',
     quickStart: 'Rýchly štart',

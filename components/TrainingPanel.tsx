@@ -646,8 +646,8 @@ export const TrainingPanel: React.FC = () => {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/15 text-pink-300 ring-1 ring-pink-500/30">
               <Lock size={22} />
             </div>
-            <h3 className="text-base font-bold text-white">Only available for subscribers.</h3>
-            <p className="mt-2 text-sm text-zinc-400">Coming soon.</p>
+            <h3 className="text-base font-bold text-white">{t('subscriberOnly')}</h3>
+            <p className="mt-2 text-sm text-zinc-400">{t('comingSoon')}</p>
           </div>
         </div>
       )}
