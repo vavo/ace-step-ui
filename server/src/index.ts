@@ -12,6 +12,7 @@ const __dirname_init = path.dirname(__filename_init);
 dotenv.config({ path: path.join(__dirname_init, '../../.env') });
 import cron from 'node-cron';
 import { config } from './config/index.js';
+import { runStartupChecks } from './services/startupChecks.js';
 import { runCleanupJob, cleanupDeletedSongs } from './services/cleanup.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,6 +34,8 @@ import socialRoutes from './routes/social.js';
 import { pool } from './db/pool.js';
 import './db/migrate.js';
 import { backfillSignupGrantLedger } from './services/credits.js';
+
+runStartupChecks();
 
 const signupGrantBackfillCount = backfillSignupGrantLedger();
 if (signupGrantBackfillCount > 0) {

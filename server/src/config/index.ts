@@ -24,7 +24,7 @@ export const config = {
 
   // SQLite database
   database: {
-    path: process.env.DATABASE_PATH || path.join(__dirname, '../../data/acestep.db'),
+    path: resolveProjectPath(process.env.DATABASE_PATH, 'data/acestep.db'),
   },
 
   // ACE-Step API (local)
