@@ -40,32 +40,61 @@ echo "Creating .env file..."
 cat > .env << EOF
 # ACE-Step UI Configuration
 
-# Path to ACE-Step installation
+# Server
+PORT=3001
+NODE_ENV=development
+FRONTEND_PORT=3000
+
+# Database (SQLite)
+DATABASE_PATH=./data/acestep.db
+
+# ACE-Step API and local checkout
+ACESTEP_API_URL=http://localhost:8001
 ACESTEP_PATH=$ACESTEP_PATH
 
-# Server ports
-PORT=3001
-FRONTEND_PORT=3000
+# Storage
+AUDIO_DIR=./public/audio
+
+# Frontend
 FRONTEND_URL=http://localhost:3000
 VITE_API_URL=http://localhost:3001
 PUBLIC_API_URL=http://localhost:3001
+PASSWORD_RESET_BASE_URL=http://localhost:3000
 
-# Database
-DATABASE_PATH=./data/acestep.db
-
-# Auth and product defaults
+# JWT Secret (for local session management)
 JWT_SECRET=ace-step-ui-local-secret
 AUTH_SESSION_DAYS=30
+SUPERADMIN_EMAIL=
+SUPERADMIN_EMAILS=
+
+# Product calendar day for credit streaks
 PRODUCT_TIME_ZONE=Europe/Bratislava
 
-# Optional Google OAuth
+# Google OAuth
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_OAUTH_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
 
-# Optional OpenAI lyrics and AI format actions
+# Optional: Pexels API Key (for video backgrounds)
+# Get a free API key at https://www.pexels.com/api/
+PEXELS_API_KEY=
+
+# Optional: Gemini API Key (for AI format actions in the UI)
+# Get a key at https://ai.google.dev/
+GEMINI_API_KEY=
+
+# Optional: OpenAI API Key (used for lyrics and AI format actions)
+# Get a key at https://platform.openai.com/api-keys
 OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4o-mini
+
+# Optional: OpenAI model and reasoning effort for lyrics and AI format actions
+OPENAI_MODEL=gpt-5.2
+OPENAI_REASONING_EFFORT=high
+
+# AI format provider:
+# - auto: try OpenAI first, then Gemini fallback
+# - openai: force OpenAI (fallback to Gemini if OpenAI key missing)
+# - gemini: force Gemini (fallback to OpenAI if Gemini key missing)
 FORMAT_PROVIDER=auto
 EOF
 

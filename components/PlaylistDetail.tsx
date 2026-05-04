@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Song, Playlist, playlistsApi, songsApi, getAudioUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../context/I18nContext';
-import { ArrowLeft, Play, Clock, Trash2, Music, Globe2, Lock } from 'lucide-react';
+import { ArrowLeft, Play, Clock, Trash2, Music, Globe2, Lock, Plus, X } from 'lucide-react';
 
 interface PlaylistDetailProps {
     playlistId: string;
@@ -19,6 +19,11 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBa
     const [playlist, setPlaylist] = useState<Playlist & { creator_avatar?: string } | null>(null);
     const [songs, setSongs] = useState<Song[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isAddSongOpen, setIsAddSongOpen] = useState(false);
+    const [librarySongs, setLibrarySongs] = useState<Song[]>([]);
+    const [loadingLibrarySongs, setLoadingLibrarySongs] = useState(false);
+    const [addSongSearch, setAddSongSearch] = useState('');
+    const [addSongError, setAddSongError] = useState('');
 
     useEffect(() => {
         loadPlaylist();
@@ -91,6 +96,49 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBa
         }
     };
 
+    const openAddSongModal = async () => {
+        if (!token || !playlist) return;
+
+        setIsAddSongOpen(true);
+        setAddSongSearch('');
+        setAddSongError('');
+        setLoadingLibrarySongs(true);
+
+        try {
+            const result = await songsApi.getMySongs(token);
+            setLibrarySongs(result.songs || []);
+        } catch (error) {
+            console.error('Failed to load songs for playlist:', error);
+            setAddSongError(t('failedToLoadSongs'));
+        } finally {
+            setLoadingLibrarySongs(false);
+        }
+    };
+
+    const handleAddSong = async (song: Song) => {
+        if (!token || !playlist) return;
+
+        try {
+            await playlistsApi.addSong(playlist.id, song.id, token);
+            setSongs(prev => {
+                if (prev.some(existing => existing.id === song.id)) return prev;
+                return [
+                    ...prev,
+                    {
+                        ...song,
+                        coverUrl: (song as any).coverUrl || song.cover_url || `https://picsum.photos/seed/${song.id}/400/400`,
+                        audioUrl: song.audioUrl || song.audio_url,
+                        addedAt: new Date().toISOString()
+                    } as Song
+                ];
+            });
+            setAddSongError('');
+        } catch (error) {
+            console.error('Failed to add song to playlist:', error);
+            setAddSongError(t('failedToAddSong'));
+        }
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center h-full bg-black">
             <div className="text-zinc-400 gap-2 flex items-center">
@@ -110,6 +158,18 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBa
     );
 
     const isOwner = currentUser?.id === playlist.user_id;
+    const playlistSongIds = new Set(songs.map(song => song.id));
+    const normalizedAddSongSearch = addSongSearch.trim().toLowerCase();
+    const addableSongs = librarySongs.filter(song => {
+        if (playlistSongIds.has(song.id)) return false;
+        if (!normalizedAddSongSearch) return true;
+        return [
+            song.title,
+            song.creator,
+            song.style,
+            ...(song.tags || [])
+        ].filter(Boolean).some(value => String(value).toLowerCase().includes(normalizedAddSongSearch));
+    });
 
     // Gradient based on ID/Name
     const gradients = [
@@ -181,6 +241,16 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBa
                 >
                     <Play size={24} fill="currentColor" className="ml-1" />
                 </button>
+
+                {isOwner && (
+                    <button
+                        onClick={openAddSongModal}
+                        className="flex items-center gap-2 rounded-full bg-white text-black px-3 py-2 text-xs md:text-sm font-bold hover:scale-105 transition-transform shadow-lg"
+                    >
+                        <Plus size={16} />
+                        {t('addSong')}
+                    </button>
+                )}
 
                 {isOwner && (
                     <button
@@ -313,6 +383,79 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBa
             >
                 <ArrowLeft size={18} />
             </button>
+
+            {isOwner && isAddSongOpen && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-white/10 p-5">
+                            <div>
+                                <h2 className="text-lg font-bold text-white">{t('addSongToPlaylist')}</h2>
+                                <p className="text-sm text-zinc-500">{playlist.name}</p>
+                            </div>
+                            <button
+                                onClick={() => setIsAddSongOpen(false)}
+                                className="rounded-full p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <input
+                                value={addSongSearch}
+                                onChange={(event) => setAddSongSearch(event.target.value)}
+                                placeholder={t('searchYourSongs')}
+                                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-white/30"
+                                autoFocus
+                            />
+
+                            {addSongError && (
+                                <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                                    {addSongError}
+                                </div>
+                            )}
+
+                            <div className="max-h-[55vh] overflow-y-auto pr-1 custom-scrollbar">
+                                {loadingLibrarySongs ? (
+                                    <div className="flex items-center justify-center py-10 text-zinc-500">
+                                        <div className="w-4 h-4 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                        {t('loadingSongs')}
+                                    </div>
+                                ) : addableSongs.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">
+                                        {t('noSongsAvailableToAdd')}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {addableSongs.map(song => (
+                                            <button
+                                                key={song.id}
+                                                onClick={() => handleAddSong(song)}
+                                                className="w-full flex items-center gap-3 rounded-xl p-3 text-left hover:bg-white/10 transition-colors group"
+                                            >
+                                                <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-800">
+                                                    <img
+                                                        src={(song as any).coverUrl || song.cover_url || `https://picsum.photos/seed/${song.id}/400/400`}
+                                                        alt=""
+                                                        className="h-full w-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="truncate font-semibold text-white">{song.title}</div>
+                                                    <div className="truncate text-xs text-zinc-500">{song.style || t('unknown')}</div>
+                                                </div>
+                                                <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-black opacity-90 group-hover:scale-105 transition-transform">
+                                                    {t('addSong')}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
