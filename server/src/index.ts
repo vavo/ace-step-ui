@@ -100,7 +100,7 @@ app.use(helmet({
       imgSrc: ["'self'", 'data:', 'https:'],
       mediaSrc: ["'self'", 'blob:', 'data:', 'http://localhost:*', 'https:'],
       objectSrc: ["'none'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", 'blob:'],
       scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
       connectSrc: ["'self'", 'blob:', 'http://localhost:*', 'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https:'],
