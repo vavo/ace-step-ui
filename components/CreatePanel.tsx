@@ -73,6 +73,15 @@ const TRACK_NAMES = [
   'keyboard', 'guitar', 'bass', 'drums', 'backing_vocals', 'vocals',
 ];
 
+function formatDurationControlValue(value: number, autoLabel: string, secondsLabel: string): string {
+  if (value === -1) return autoLabel;
+  if (!Number.isFinite(value)) return autoLabel;
+  if (value < 60) return `${value}${secondsLabel}`;
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.floor(value % 60);
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 function clampInt(value: unknown, fallback: number, min: number, max: number): number {
   const parsed = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(parsed)) return fallback;
@@ -792,7 +801,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         if (target === 'style' && result.caption) setStyle(result.caption);
         if (target === 'lyrics' && result.lyrics) setLyrics(result.lyrics);
         if (result.bpm && result.bpm > 0) setBpm(result.bpm);
-        if (result.duration && result.duration > 0) setDuration(result.duration);
+        if (duration > 0 && result.duration && result.duration > 0) setDuration(result.duration);
         if (result.key_scale) setKeyScale(result.key_scale);
         if (result.time_signature) {
           const ts = String(result.time_signature);
@@ -1972,7 +1981,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               max={600}
               step={5}
               onChange={setDuration}
-              formatDisplay={(val) => val === -1 ? t('auto') : `${val}${t('seconds')}`}
+              formatDisplay={(val) => formatDurationControlValue(val, t('auto'), t('seconds'))}
               autoLabel={t('auto')}
               helpText={`${t('auto')} - 10 ${t('min')}`}
             />

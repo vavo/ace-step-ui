@@ -61,6 +61,7 @@ export function resolvePythonPath(baseDir: string): string {
 const ACESTEP_DIR = resolveAceStepPath();
 const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
 const PYTHON_SCRIPT = path.join(SCRIPTS_DIR, 'simple_generate.py');
+const DEFAULT_AUTO_DURATION_SECONDS = 120;
 
 function getFallbackAudioFormat(params: Pick<GenerationParams, 'audioFormat'>): 'wav' | 'flac' {
   if (params.audioFormat === 'flac') {
@@ -75,6 +76,10 @@ function getAudioExtension(filePath: string): '.mp3' | '.flac' | '.wav' | '' {
     return ext;
   }
   return '';
+}
+
+function resolveRequestedDuration(params: Pick<GenerationParams, 'duration'>): number {
+  return params.duration && params.duration > 0 ? params.duration : DEFAULT_AUTO_DURATION_SECONDS;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +168,7 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
     params.randomSeed !== false,                                  //  8: Random Seed
     String(params.seed ?? -1),                                    //  9: Seed
     referenceAudio,                                               // 10: Reference Audio (filepath | null)
-    params.duration && params.duration > 0 ? params.duration : -1, // 11: Audio Duration (-1 = auto)
+    resolveRequestedDuration(params),                              // 11: Audio Duration
     Math.min(Math.max(params.batchSize ?? 1, 1), 16),            // 12: Batch Size (clamped 1-16)
     sourceAudio,                                                  // 13: Source Audio (filepath | null)
     params.audioCodes || '',                                      // 14: LM Codes Hints
@@ -667,7 +672,7 @@ async function processGenerationViaPython(
     const jobOutputDir = path.join(ACESTEP_DIR, 'output', jobId);
     await mkdir(jobOutputDir, { recursive: true });
 
-    const durationToSend = params.duration && params.duration > 0 ? params.duration : 60;
+    const durationToSend = resolveRequestedDuration(params);
     const args = [
       '--prompt', prompt,
       '--duration', String(durationToSend),
