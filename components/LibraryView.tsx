@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Song, Playlist } from '../types';
-import { Heart, Plus, Music, Play, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Heart, Plus, Music, Play, MoreHorizontal, Trash2, Upload, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
@@ -21,6 +21,8 @@ interface LibraryViewProps {
   onReusePrompt?: (song: Song) => void;
   onDeleteSong?: (song: Song) => void;
   onDeleteReferenceTrack?: (trackId: string) => void;
+  onUploadReferenceTrack?: (file: File) => Promise<void>;
+  isUploadingReferenceTrack?: boolean;
 }
 
 interface ReferenceTrack {
@@ -47,12 +49,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     onReusePrompt,
     onDeleteSong,
     onDeleteReferenceTrack,
+    onUploadReferenceTrack,
+    isUploadingReferenceTrack = false,
 }) => {
     const { t } = useI18n();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'all' | 'playlists' | 'liked' | 'uploads'>('all');
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [shareSong, setShareSong] = useState<Song | null>(null);
+    const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
     const formatBytes = (bytes?: number | null) => {
         if (!bytes || bytes <= 0) return '0 B';
@@ -64,6 +69,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             unit += 1;
         }
         return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+    };
+
+    const openUploadPicker = () => {
+        if (isUploadingReferenceTrack) return;
+        uploadInputRef.current?.click();
+    };
+
+    const handleUploadFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.currentTarget.files?.[0];
+        event.currentTarget.value = '';
+        if (file) {
+            void onUploadReferenceTrack?.(file);
+        }
     };
 
     return (
@@ -271,11 +289,44 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
              )}
              {activeTab === 'uploads' && (
                  <div className="space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-dashed border-zinc-300 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900/40 p-4">
+                        <div className="min-w-0">
+                            <div className="text-sm font-semibold text-zinc-900 dark:text-white">{t('uploadAudio')}</div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">{t('uploadAudioFilesAsReferences')} · {t('audioFormats')}</div>
+                        </div>
+                        <input
+                            ref={uploadInputRef}
+                            type="file"
+                            accept=".mp3,.wav,.flac,.m4a,.mp4,audio/*"
+                            className="hidden"
+                            onChange={handleUploadFileChange}
+                        />
+                        <button
+                            type="button"
+                            onClick={openUploadPicker}
+                            disabled={!onUploadReferenceTrack || isUploadingReferenceTrack}
+                            className="inline-flex items-center justify-center gap-2 rounded-full bg-zinc-900 dark:bg-white px-4 py-2 text-sm font-semibold text-white dark:text-zinc-950 transition-colors hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {isUploadingReferenceTrack ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    {t('uploadingAudio')}
+                                </>
+                            ) : (
+                                <>
+                                    <Upload size={16} />
+                                    {t('uploadAudio')}
+                                </>
+                            )}
+                        </button>
+                    </div>
                     {referenceTracks.length === 0 ? (
                         <EmptyState
                             icon={<Music size={22} />}
                             title={t('uploadsEmptyTitle')}
                             body={t('uploadsEmptyBody')}
+                            actionLabel={t('uploadAudio')}
+                            onAction={onUploadReferenceTrack ? openUploadPicker : undefined}
                         />
                     ) : (
                         referenceTracks.map((track) => (

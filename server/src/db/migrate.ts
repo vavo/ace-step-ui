@@ -1,4 +1,5 @@
 import { db } from './pool.js';
+import { randomUUID } from 'crypto';
 
 const migrations = `
 -- Users table
@@ -305,6 +306,19 @@ function ensureGenerationJobColumns(): void {
   db.exec('UPDATE generation_jobs SET credits_refunded = 0 WHERE credits_refunded IS NULL');
 }
 
+function ensureReferenceTrackIds(): void {
+  const tableInfo = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'reference_tracks'").get();
+  if (!tableInfo) return;
+
+  const rows = db.prepare(
+    "SELECT rowid FROM reference_tracks WHERE id IS NULL OR TRIM(id) = ''"
+  ).all() as Array<{ rowid: number }>;
+  const update = db.prepare('UPDATE reference_tracks SET id = ? WHERE rowid = ?');
+  for (const row of rows) {
+    update.run(randomUUID(), row.rowid);
+  }
+}
+
 function migrate(): void {
   console.log('Running SQLite database migrations...');
 
@@ -324,6 +338,7 @@ function migrate(): void {
 
   ensureProductColumns();
   ensureGenerationJobColumns();
+  ensureReferenceTrackIds();
   console.log('Migrations completed successfully!');
 }
 

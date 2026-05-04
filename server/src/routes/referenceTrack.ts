@@ -4,6 +4,7 @@ import path from 'path';
 import os from 'os';
 import { promises as fs } from 'fs';
 import { pool } from '../db/pool.js';
+import { generateUUID } from '../db/sqlite.js';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 import { getStorageProvider } from '../services/storage/factory.js';
 import { config } from '../config/index.js';
@@ -155,6 +156,7 @@ router.post('/', authMiddleware, upload.single('audio'), async (req: Authenticat
     }
 
     const userId = req.user!.id;
+    const trackId = generateUUID();
     const originalFilename = req.file.originalname;
     const ext = path.extname(originalFilename) || '.mp3';
     const timestamp = Date.now();
@@ -169,10 +171,10 @@ router.post('/', authMiddleware, upload.single('audio'), async (req: Authenticat
     const tags = req.body.tags ? JSON.parse(req.body.tags) : null;
 
     const result = await pool.query(
-      `INSERT INTO reference_tracks (user_id, filename, storage_key, file_size_bytes, tags)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO reference_tracks (id, user_id, filename, storage_key, file_size_bytes, tags)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [userId, originalFilename, key, req.file.size, tags]
+      [trackId, userId, originalFilename, key, req.file.size, tags]
     );
 
     res.status(201).json({

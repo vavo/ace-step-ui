@@ -54,6 +54,7 @@ function AppContent() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [likedSongIds, setLikedSongIds] = useState<Set<string>>(new Set());
   const [referenceTracks, setReferenceTracks] = useState<ReferenceTrack[]>([]);
+  const [isUploadingReferenceTrack, setIsUploadingReferenceTrack] = useState(false);
   const [playQueue, setPlayQueue] = useState<Song[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
 
@@ -429,6 +430,44 @@ function AppContent() {
       loadReferenceTracks();
     }
   }, [currentView, loadReferenceTracks]);
+
+  const handleUploadReferenceTrack = useCallback(async (file: File) => {
+    if (!token) {
+      showToast(t('uploadFailed'), 'error');
+      return;
+    }
+
+    setIsUploadingReferenceTrack(true);
+    try {
+      const formData = new FormData();
+      formData.append('audio', file);
+
+      const response = await fetch('/api/reference-tracks', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error || errorBody.details || t('uploadFailed'));
+      }
+
+      const data = await response.json();
+      if (data.track) {
+        setReferenceTracks(prev => [data.track, ...prev]);
+      } else {
+        await loadReferenceTracks();
+      }
+      showToast(t('uploaded'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('uploadFailed');
+      showToast(message, 'error');
+    } finally {
+      setIsUploadingReferenceTrack(false);
+    }
+  }, [loadReferenceTracks, showToast, t, token]);
 
   // Player Logic
   const getActiveQueue = (song?: Song) => {
@@ -1278,6 +1317,8 @@ function AppContent() {
             onReusePrompt={handleReuse}
             onDeleteSong={handleDeleteSong}
             onDeleteReferenceTrack={handleDeleteReferenceTrack}
+            onUploadReferenceTrack={handleUploadReferenceTrack}
+            isUploadingReferenceTrack={isUploadingReferenceTrack}
           />
         );
       }
