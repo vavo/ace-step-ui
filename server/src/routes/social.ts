@@ -159,13 +159,15 @@ router.get('/leaderboards', optionalAuthMiddleware, async (req: AuthenticatedReq
       [periodStart, periodStart, limit]
     );
 
+    const viewerId = req.user?.id || null;
     const creatorResult = await pool.query(
       `WITH weekly_songs AS (
          SELECT user_id,
                 COUNT(*) as published_song_count,
                 COALESCE(SUM(like_count), 0) as likes_received
          FROM songs
-         WHERE is_public = 1 AND created_at >= ?
+         WHERE (is_public = 1 OR (? IS NOT NULL AND user_id = ?))
+           AND created_at >= ?
          GROUP BY user_id
        ),
        weekly_followers AS (
@@ -182,22 +184,22 @@ router.get('/leaderboards', optionalAuthMiddleware, async (req: AuthenticatedReq
          WHERE period_start = ?
          GROUP BY user_id
        ),
-       public_creator_totals AS (
+       visible_creator_totals AS (
          SELECT user_id,
-                COUNT(*) as total_public_song_count,
+                COUNT(*) as total_visible_song_count,
                 COALESCE(SUM(like_count), 0) as total_likes_received
          FROM songs
-         WHERE is_public = 1
+         WHERE is_public = 1 OR (? IS NOT NULL AND user_id = ?)
          GROUP BY user_id
        )
        SELECT u.id, u.username, u.avatar_url, u.bio, u.xp, u.level,
               CASE
                 WHEN COALESCE(ws.published_song_count, 0) > 0 THEN COALESCE(ws.published_song_count, 0)
-                ELSE COALESCE(pct.total_public_song_count, 0)
+                ELSE COALESCE(vct.total_visible_song_count, 0)
               END as published_song_count,
               CASE
                 WHEN COALESCE(ws.likes_received, 0) > 0 THEN COALESCE(ws.likes_received, 0)
-                ELSE COALESCE(pct.total_likes_received, 0)
+                ELSE COALESCE(vct.total_likes_received, 0)
               END as likes_received,
               COALESCE(wf.follower_growth, 0) as follower_growth,
               COALESCE(we.event_points, 0) as event_points,
@@ -214,8 +216,8 @@ router.get('/leaderboards', optionalAuthMiddleware, async (req: AuthenticatedReq
                   + COALESCE(we.event_points, 0)
                 )
                 ELSE (
-                  COALESCE(pct.total_public_song_count, 0) * 20
-                  + COALESCE(pct.total_likes_received, 0) * 5
+                  COALESCE(vct.total_visible_song_count, 0) * 20
+                  + COALESCE(vct.total_likes_received, 0) * 5
                   + COALESCE(u.xp, 0)
                 )
               END as leaderboard_score
@@ -223,15 +225,15 @@ router.get('/leaderboards', optionalAuthMiddleware, async (req: AuthenticatedReq
        LEFT JOIN weekly_songs ws ON ws.user_id = u.id
        LEFT JOIN weekly_followers wf ON wf.user_id = u.id
        LEFT JOIN weekly_events we ON we.user_id = u.id
-       LEFT JOIN public_creator_totals pct ON pct.user_id = u.id
-       WHERE COALESCE(pct.total_public_song_count, 0) > 0
+       LEFT JOIN visible_creator_totals vct ON vct.user_id = u.id
+       WHERE COALESCE(vct.total_visible_song_count, 0) > 0
           OR COALESCE(ws.published_song_count, 0) > 0
           OR COALESCE(ws.likes_received, 0) > 0
           OR COALESCE(wf.follower_growth, 0) > 0
           OR COALESCE(we.event_points, 0) > 0
        ORDER BY leaderboard_score DESC, COALESCE(u.xp, 0) DESC
        LIMIT ?`,
-      [periodStart, periodStart, periodStart, limit]
+      [viewerId, viewerId, periodStart, periodStart, periodStart, viewerId, viewerId, limit]
     );
 
     const songs = await Promise.all(songResult.rows.map(mapFeedSong));

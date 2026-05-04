@@ -196,8 +196,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
                 icon={<Users size={22} />}
                 title={t('leaderboardEmpty')}
                 body={t('leaderboardEmptyBody')}
-                actionLabel={onNavigateToCreate ? t('createFirstSong') : undefined}
-                onAction={onNavigateToCreate}
               />
             ) : data.creators.map((creator) => (
               <button
