@@ -101,7 +101,7 @@ const RANDOM_DESCRIPTION_FALLBACKS = [
   'A dreamy ambient pop song with airy vocals, reverb-heavy guitar, and sparse percussion.',
 ];
 
-function getRandomDescriptionFallback() {
+function getRandomDescriptionFallback(): Omit<RandomDescriptionResult, 'fallback' | 'error'> {
   const idx = Math.floor(Math.random() * RANDOM_DESCRIPTION_FALLBACKS.length);
   return {
     description: RANDOM_DESCRIPTION_FALLBACKS[idx],
@@ -220,7 +220,8 @@ Hard rules:
 - If the user asks for a vocal gender or vocal tone (for example female, male, raspy, hoarse, soft, powerful), keep it in the caption.
 - If the user asks for a genre (for example jungle, rock, pop, hip hop, trap, house, techno, metal, punk, folk), keep that genre in the caption.
 - If lyrics are provided, polish them without changing their language or meaning.
-- If lyrics are not provided, do not invent a full unrelated narrative; only improve the style caption.
+- If lyrics are not provided and the user did not ask for instrumental music, generate complete original lyrics from the caption with clear verse/chorus structure.
+- Prefer Slovak lyrics when the requested vocal language is Slovak or the caption is Slovak.
 - Return reasonable bpm/duration only when implied by the genre or request.
 
 Input:
@@ -255,6 +256,7 @@ Rules:
 - Preserve every explicit user constraint: genre, subgenre, language, vocal gender, vocal tone, mood/emotion, BPM, key, time signature, duration, instrumentation, and vocal vs instrumental intent.
 - Never replace a requested genre with a different genre.
 - Never turn a vocal request into an instrumental request unless the user explicitly asks for instrumental.
+- If lyrics are missing and the user did not ask for instrumental music, generate complete original lyrics that match the requested caption, language, mood, and genre.
 - Never add novelty concepts, meme elements, sound effects, or unrelated instruments unless the user asks for them.
 - If the user writes in Slovak/Czech or requests Slovak/Czech vocals, preserve that language request.
 - If the user specifies vocal gender or tone, keep it in the caption.

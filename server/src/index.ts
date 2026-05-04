@@ -100,7 +100,7 @@ app.use(helmet({
       imgSrc: ["'self'", 'data:', 'https:'],
       mediaSrc: ["'self'", 'blob:', 'data:', 'http://localhost:*', 'https:'],
       objectSrc: ["'none'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'blob:', 'https://esm.sh', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
+      scriptSrc: ["'self'"],
       scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
       connectSrc: ["'self'", 'blob:', 'http://localhost:*', 'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https:'],
