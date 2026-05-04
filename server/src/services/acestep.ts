@@ -131,7 +131,7 @@ async function prepareAudioFile(audioUrl: string | undefined): Promise<unknown> 
   const filePath = resolveAudioPath(audioUrl);
 
   try {
-    let buffer = await readFile(filePath);
+    let buffer: Buffer = await readFile(filePath);
     let ext = path.extname(filePath).toLowerCase();
     if (shouldConvertForAceStep(filePath)) {
       buffer = await transcodeToWav(buffer);
