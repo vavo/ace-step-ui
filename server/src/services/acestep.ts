@@ -862,7 +862,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
   if (!job) {
     return {
       status: 'failed',
-      error: 'Job not found',
+      error: 'Generation worker restarted before this job finished',
     };
   }
 

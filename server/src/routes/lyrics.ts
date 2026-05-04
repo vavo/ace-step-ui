@@ -30,19 +30,40 @@ function usesReasoningControls(model: string): boolean {
   return /\b(gpt-5|o[1-9]|o\d)/i.test(model);
 }
 
-function parseDraftJson(text: string): LyricsDraft | null {
+function toDraftString(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) return value.map(toDraftString).filter(Boolean).join('\n').trim();
+  if (value && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).map(toDraftString).filter(Boolean).join('\n').trim();
+  }
+  return '';
+}
+
+function parseDraftJson(text: string, fallback: Required<LyricsDraftBody>): LyricsDraft | null {
   const first = text.indexOf('{');
   const last = text.lastIndexOf('}');
-  if (first < 0 || last <= first) return null;
+  if (first < 0 || last <= first) {
+    const lyrics = text.trim();
+    if (lyrics.length < 20) return null;
+    return {
+      title: fallback.prompt.slice(0, 60) || 'Nový text',
+      lyrics,
+      stylePrompt: fallback.style || fallback.prompt,
+      language: fallback.language || 'sk',
+    };
+  }
 
   try {
-    const parsed = JSON.parse(text.slice(first, last + 1)) as Partial<LyricsDraft>;
-    if (!parsed.title || !parsed.lyrics || !parsed.stylePrompt) return null;
+    const parsed = JSON.parse(text.slice(first, last + 1)) as Record<string, unknown>;
+    const title = toDraftString(parsed.title || parsed.name || parsed.songTitle) || fallback.prompt.slice(0, 60) || 'Nový text';
+    const lyrics = toDraftString(parsed.lyrics || parsed.lyric || parsed.text || parsed.draft);
+    const stylePrompt = toDraftString(parsed.stylePrompt || parsed.style_prompt || parsed.style || parsed.caption) || fallback.style || fallback.prompt;
+    if (!lyrics || !stylePrompt) return null;
     return {
-      title: String(parsed.title).trim(),
-      lyrics: String(parsed.lyrics).trim(),
-      stylePrompt: String(parsed.stylePrompt).trim(),
-      language: String(parsed.language || 'sk').trim() || 'sk',
+      title,
+      lyrics,
+      stylePrompt,
+      language: toDraftString(parsed.language || parsed.vocal_language) || fallback.language || 'sk',
     };
   } catch {
     return null;
@@ -70,14 +91,20 @@ Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on pr
   const model = config.openai.model;
   const payload: Record<string, unknown> = {
     model,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [
+      {
+        role: 'system',
+        content: 'Return only valid JSON. Required keys: title, lyrics, stylePrompt, language. The lyrics value must be a non-empty string.',
+      },
+      { role: 'user', content: prompt },
+    ],
     response_format: { type: 'json_object' },
   };
 
   const useReasoningControls = usesReasoningControls(model);
   if (useReasoningControls) {
     payload.reasoning_effort = config.openai.reasoningEffort;
-    payload.max_completion_tokens = 900;
+    payload.max_completion_tokens = 2000;
   } else {
     payload.temperature = 0.9;
     payload.top_p = 0.95;
@@ -105,7 +132,7 @@ Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on pr
     delete payload.temperature;
     delete payload.top_p;
     payload.reasoning_effort = config.openai.reasoningEffort;
-    payload.max_completion_tokens = 900;
+    payload.max_completion_tokens = 2000;
 
     response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -125,11 +152,15 @@ Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on pr
   }
 
   const responseJson = JSON.parse(responseText) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   };
   const rawText = responseJson.choices?.[0]?.message?.content ?? '';
-  const draft = parseDraftJson(rawText);
+  const draft = parseDraftJson(rawText, input);
   if (!draft) {
+    console.error('[Lyrics] Invalid draft response:', {
+      finishReason: responseJson.choices?.[0]?.finish_reason,
+      preview: rawText.slice(0, 500),
+    });
     throw new Error('Lyrics generation returned an invalid draft');
   }
   return draft;
