@@ -20,7 +20,29 @@ function isFlacAudio(value: string | null): boolean {
 function localAudioPath(audioUrl: string): string | null {
   if (!audioUrl.startsWith('/audio/')) return null;
   const cleanKey = audioUrl.slice('/audio/'.length).replace(/^\/+/, '');
-  return path.join(config.storage.audioDir, cleanKey);
+  const root = path.resolve(config.storage.audioDir);
+  const resolved = path.resolve(root, cleanKey);
+  return resolved === root || resolved.startsWith(`${root}${path.sep}`) ? resolved : null;
+}
+
+function contentTypeForAudioPath(audioUrl: string): string {
+  const ext = path.extname(audioUrl.split('?')[0]).toLowerCase();
+  switch (ext) {
+    case '.wav':
+      return 'audio/wav';
+    case '.flac':
+      return 'audio/flac';
+    case '.m4a':
+    case '.mp4':
+      return 'audio/mp4';
+    case '.ogg':
+      return 'audio/ogg';
+    case '.webm':
+      return 'audio/webm';
+    case '.mp3':
+    default:
+      return 'audio/mpeg';
+  }
 }
 
 async function sendMp3Fallback(res: Response, input: Buffer): Promise<void> {
@@ -45,8 +67,9 @@ async function resolveAudioUrl(audioUrl: string | null): Promise<string | null> 
 }
 
 // Helper: resolve audio URL for direct playback
-async function resolveAccessibleAudioUrl(audioUrl: string | null, isPublic: boolean): Promise<string | null> {
+async function resolveAccessibleAudioUrl(audioUrl: string | null, isPublic: boolean, songId?: string): Promise<string | null> {
   if (!audioUrl) return null;
+  if (songId) return `/api/songs/${encodeURIComponent(songId)}/audio`;
   if (audioUrl.startsWith('s3://')) {
     const storageKey = audioUrl.replace('s3://', '');
     const storage = getStorageProvider();
@@ -81,17 +104,26 @@ router.get('/:id/audio', optionalAuthMiddleware, async (req: AuthenticatedReques
       return;
     }
 
-    // Local files: redirect browser-safe formats, transcode FLAC for Safari/WebKit.
+    // Local files: proxy through this route so private song audio is not exposed
+    // by generic static hosting. Transcode FLAC for Safari/WebKit.
     if (audioUrl.startsWith('/')) {
-      if (isFlacAudio(audioUrl)) {
-        const filePath = localAudioPath(audioUrl);
-        if (!filePath) {
-          res.status(404).json({ error: 'Audio not available' });
-          return;
-        }
+      const filePath = localAudioPath(audioUrl);
+      if (!filePath) {
+        res.status(404).json({ error: 'Audio not available' });
+        return;
+      }
 
+      let buffer: Buffer;
+      try {
+        buffer = await readFile(filePath);
+      } catch (error) {
+        console.error('Local audio read failed:', error);
+        res.status(404).json({ error: 'Audio not available' });
+        return;
+      }
+
+      if (isFlacAudio(audioUrl)) {
         try {
-          const buffer = await readFile(filePath);
           await sendMp3Fallback(res, buffer);
         } catch (error) {
           console.error('FLAC playback transcode failed:', error);
@@ -100,7 +132,10 @@ router.get('/:id/audio', optionalAuthMiddleware, async (req: AuthenticatedReques
         return;
       }
 
-      res.redirect(audioUrl);
+      res.setHeader('Content-Type', contentTypeForAudioPath(audioUrl));
+      res.setHeader('Content-Length', String(buffer.length));
+      res.setHeader('Cache-Control', song.is_public ? 'public, max-age=3600' : 'private, max-age=300');
+      res.send(buffer);
       return;
     }
 
@@ -172,7 +207,7 @@ router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response)
     const songs = await Promise.all(
       result.rows.map(async (row) => ({
         ...row,
-        audio_url: await resolveAccessibleAudioUrl(row.audio_url, row.is_public),
+        audio_url: await resolveAccessibleAudioUrl(row.audio_url, row.is_public, row.id),
       }))
     );
 
@@ -205,7 +240,7 @@ router.get('/public/featured', optionalAuthMiddleware, async (_req: Authenticate
         style: row.style,
         caption: row.caption,
         cover_url: row.cover_url,
-        audio_url: await resolveAccessibleAudioUrl(row.audio_url, true),
+        audio_url: await resolveAccessibleAudioUrl(row.audio_url, true, row.id),
         duration: row.duration,
         bpm: row.bpm,
         key_scale: row.key_scale,
@@ -249,7 +284,7 @@ router.get('/public', optionalAuthMiddleware, async (req: AuthenticatedRequest, 
     const songs = await Promise.all(
       result.rows.map(async (row) => ({
         ...row,
-        audio_url: await resolveAccessibleAudioUrl(row.audio_url, true),
+        audio_url: await resolveAccessibleAudioUrl(row.audio_url, true, row.id),
       }))
     );
 
@@ -288,7 +323,7 @@ router.get('/:id', optionalAuthMiddleware, async (req: AuthenticatedRequest, res
 
     const resolvedSong = {
       ...song,
-      audio_url: await resolveAccessibleAudioUrl(song.audio_url, song.is_public),
+      audio_url: await resolveAccessibleAudioUrl(song.audio_url, song.is_public, song.id),
     };
 
     res.json({ song: resolvedSong });
@@ -341,7 +376,7 @@ router.get('/:id/full', optionalAuthMiddleware, async (req: AuthenticatedRequest
 
     const resolvedSong = {
       ...song,
-      audio_url: await resolveAccessibleAudioUrl(song.audio_url, song.is_public),
+      audio_url: await resolveAccessibleAudioUrl(song.audio_url, song.is_public, song.id),
     };
 
     res.json({
@@ -568,7 +603,7 @@ router.get('/liked/list', authMiddleware, async (req: AuthenticatedRequest, res:
     const songs = await Promise.all(
       result.rows.map(async (row) => ({
         ...row,
-        audio_url: await resolveAccessibleAudioUrl(row.audio_url, row.is_public),
+        audio_url: await resolveAccessibleAudioUrl(row.audio_url, row.is_public, row.id),
       }))
     );
 

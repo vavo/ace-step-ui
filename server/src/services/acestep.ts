@@ -171,7 +171,8 @@ async function prepareAudioFile(audioUrl: string | undefined): Promise<unknown> 
       '.opus': 'audio/opus', '.m4a': 'audio/mp4', '.mp4': 'audio/mp4',
     };
     const mimeType = mimeMap[ext] || 'audio/mpeg';
-    const blob = new Blob([buffer], { type: mimeType });
+    const blobPart = new Uint8Array(buffer);
+    const blob = new Blob([blobPart], { type: mimeType });
     return handle_file(blob);
   } catch (error) {
     console.warn(`[Gradio] Failed to read audio file ${filePath}:`, error);

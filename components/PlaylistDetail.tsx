@@ -127,7 +127,7 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({ playlistId, onBa
                     {
                         ...song,
                         coverUrl: (song as any).coverUrl || song.cover_url || `https://picsum.photos/seed/${song.id}/400/400`,
-                        audioUrl: song.audioUrl || song.audio_url,
+                        audioUrl: getAudioUrl(song.audio_url || song.audioUrl, song.id),
                         addedAt: new Date().toISOString()
                     } as Song
                 ];

@@ -135,8 +135,17 @@ app.use('/acestep-api', createProxyMiddleware({
   },
 }));
 
-// Serve static audio files
-app.use('/audio', express.static(config.storage.audioDir));
+// Serve only explicitly public local media. Generated song files at /audio/<file>
+// are served through authenticated API routes instead of generic static hosting.
+const publicAudioPrefixes = ['avatars/', 'banners/', 'reference-tracks/', 'references/'];
+app.use('/audio', (req, res, next) => {
+  const requestedKey = decodeURIComponent(req.path).replace(/^\/+/, '');
+  if (publicAudioPrefixes.some((prefix) => requestedKey.startsWith(prefix))) {
+    next();
+    return;
+  }
+  res.status(404).json({ error: 'Audio not found' });
+}, express.static(config.storage.audioDir));
 
 // Audio Editor (AudioMass) - needs relaxed CSP for inline scripts and external images
 app.use('/editor', (req, res, next) => {
