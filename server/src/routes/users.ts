@@ -13,7 +13,7 @@ const userSelectFields = 'id, username, created_at, bio, avatar_url, banner_url,
 function getValidUiLanguage(language: unknown): string | null {
   if (typeof language !== 'string') return null;
   const normalized = language.toLowerCase();
-  return ['en', 'zh', 'ja', 'ko', 'sk'].includes(normalized) ? normalized : null;
+  return ['en', 'sk'].includes(normalized) ? normalized : null;
 }
 
 function getValidVocalLanguage(language: unknown): string | null {

@@ -10,7 +10,7 @@ interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 const isValidLanguage = (value: string | null): value is Language => {
-  return value === 'zh' || value === 'en' || value === 'ja' || value === 'ko' || value === 'sk';
+  return value === 'en' || value === 'sk';
 };
 
 export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -37,8 +37,6 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const localeForLanguage = (language: Language): string => {
   switch (language) {
-    case 'zh':
-      return 'zh-CN';
     case 'sk':
       return 'sk-SK';
     default:

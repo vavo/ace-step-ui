@@ -28,7 +28,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
         uiLanguage: (user?.default_ui_language as Language | undefined) || language,
     });
 
-    const supportedLanguages: Language[] = ['en', 'zh', 'ja', 'ko', 'sk'];
+    const supportedLanguages: Language[] = ['sk', 'en'];
     const resolveUiLanguage = (value: unknown): Language => {
         return typeof value === 'string' && supportedLanguages.includes(value as Language)
             ? (value as Language)
@@ -232,11 +232,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                     onChange={(e) => setDefaultUiLanguage(e.target.value as Language)}
                                     className="w-full appearance-none py-3 px-4 pr-10 rounded-lg border-2 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium transition-colors hover:border-zinc-400 dark:hover:border-zinc-600 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 cursor-pointer"
                                 >
-                                    <option value="en">{t('english')}</option>
-                                    <option value="zh">{t('chinese')}</option>
-                                    <option value="ja">{t('japaneseLanguage')}</option>
-                                    <option value="ko">{t('koreanLanguage')}</option>
                                     <option value="sk">{t('slovak')}</option>
+                                    <option value="en">{t('english')}</option>
                                 </select>
                                 <ChevronDown
                                     size={20}
