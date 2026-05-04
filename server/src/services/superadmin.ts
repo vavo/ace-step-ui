@@ -4,7 +4,23 @@ export function normalizeEmail(email: unknown): string {
   return typeof email === 'string' ? email.trim().toLowerCase() : '';
 }
 
+function configuredSuperadminEmails(): Set<string> {
+  const raw = [
+    config.auth.superadminEmail,
+    process.env.SUPERADMIN_EMAILS,
+  ]
+    .filter(Boolean)
+    .join(',');
+
+  return new Set(
+    raw
+      .split(/[,;\s]+/)
+      .map(normalizeEmail)
+      .filter(Boolean)
+  );
+}
+
 export function isSuperadminEmail(email: unknown): boolean {
-  const configuredEmail = normalizeEmail(config.auth.superadminEmail);
-  return Boolean(configuredEmail && normalizeEmail(email) === configuredEmail);
+  const normalizedEmail = normalizeEmail(email);
+  return Boolean(normalizedEmail && configuredSuperadminEmails().has(normalizedEmail));
 }

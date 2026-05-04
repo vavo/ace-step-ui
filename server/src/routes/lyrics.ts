@@ -27,7 +27,7 @@ type LyricsDraft = {
 };
 
 function usesReasoningControls(model: string): boolean {
-  return /^(gpt-5|o[1-9]|o\d)/i.test(model);
+  return /\b(gpt-5|o[1-9]|o\d)/i.test(model);
 }
 
 function parseDraftJson(text: string): LyricsDraft | null {
@@ -74,7 +74,8 @@ Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on pr
     response_format: { type: 'json_object' },
   };
 
-  if (usesReasoningControls(model)) {
+  const useReasoningControls = usesReasoningControls(model);
+  if (useReasoningControls) {
     payload.reasoning_effort = config.openai.reasoningEffort;
     payload.max_completion_tokens = 900;
   } else {
@@ -83,7 +84,7 @@ Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on pr
     payload.max_tokens = 900;
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  let response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -93,7 +94,31 @@ Style: ${input.style || 'modern pop / hiphop / rock / electronic depending on pr
     signal: AbortSignal.timeout(120_000),
   });
 
-  const responseText = await response.text();
+  let responseText = await response.text();
+  if (
+    !response.ok
+    && response.status === 400
+    && !useReasoningControls
+    && /max_tokens.*max_completion_tokens|unsupported parameter/i.test(responseText)
+  ) {
+    delete payload.max_tokens;
+    delete payload.temperature;
+    delete payload.top_p;
+    payload.reasoning_effort = config.openai.reasoningEffort;
+    payload.max_completion_tokens = 900;
+
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.openai.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(120_000),
+    });
+    responseText = await response.text();
+  }
+
   if (!response.ok) {
     console.error('[Lyrics] OpenAI API failed:', response.status, responseText.slice(0, 500));
     throw new Error('Lyrics generation failed');

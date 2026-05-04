@@ -16,6 +16,7 @@ import {
   userSelectFields,
 } from '../services/authSessions.js';
 import { recordSignupGrantIfMissing } from '../services/credits.js';
+import { isSuperadminEmail } from '../services/superadmin.js';
 
 const router = Router();
 const scrypt = promisify(scryptCallback);
@@ -147,14 +148,17 @@ function buildResetUrl(token: string): string {
 
 async function upsertGoogleUser(profile: GoogleProfile) {
   const profileEmail = normalizeEmail(profile.email) || null;
+  const isSuperadmin = isSuperadminEmail(profileEmail);
   const byGoogleSub = await pool.query(`SELECT ${userSelectFields} FROM users WHERE google_sub = ?`, [profile.sub]);
   if (byGoogleSub.rows.length > 0) {
     const user = byGoogleSub.rows[0];
     await pool.query(
       `UPDATE users
-       SET email = ?, display_name = ?, avatar_url = COALESCE(avatar_url, ?), auth_provider = 'google', updated_at = datetime('now')
+       SET email = ?, display_name = ?, avatar_url = COALESCE(avatar_url, ?), auth_provider = 'google',
+           is_admin = CASE WHEN ? THEN 1 ELSE is_admin END,
+           updated_at = datetime('now')
        WHERE id = ?`,
-      [profileEmail, profile.name || null, profile.picture || null, user.id]
+      [profileEmail, profile.name || null, profile.picture || null, isSuperadmin ? 1 : 0, user.id]
     );
     const updated = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [user.id]);
     return updated.rows[0];
@@ -166,9 +170,11 @@ async function upsertGoogleUser(profile: GoogleProfile) {
       const user = byEmail.rows[0];
       await pool.query(
         `UPDATE users
-         SET google_sub = ?, display_name = ?, avatar_url = COALESCE(avatar_url, ?), auth_provider = 'google', updated_at = datetime('now')
+         SET google_sub = ?, display_name = ?, avatar_url = COALESCE(avatar_url, ?), auth_provider = 'google',
+             is_admin = CASE WHEN ? THEN 1 ELSE is_admin END,
+             updated_at = datetime('now')
          WHERE id = ?`,
-        [profile.sub, profile.name || null, profile.picture || null, user.id]
+        [profile.sub, profile.name || null, profile.picture || null, isSuperadmin ? 1 : 0, user.id]
       );
       const updated = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [user.id]);
       return updated.rows[0];
@@ -181,8 +187,8 @@ async function upsertGoogleUser(profile: GoogleProfile) {
   await pool.query(
     `INSERT INTO users
        (id, username, email, google_sub, auth_provider, display_name, avatar_url, is_admin, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'google', ?, ?, 0, datetime('now'), datetime('now'))`,
-    [userId, username, profileEmail, profile.sub, profile.name || null, profile.picture || null]
+     VALUES (?, ?, ?, ?, 'google', ?, ?, ?, datetime('now'), datetime('now'))`,
+    [userId, username, profileEmail, profile.sub, profile.name || null, profile.picture || null, isSuperadmin ? 1 : 0]
   );
 
   const newUser = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [userId]);
@@ -346,11 +352,12 @@ router.post('/email/register', async (req: Request<object, object, Partial<Email
 
     const userId = generateUUID();
     const passwordHash = await hashPassword(password);
+    const isSuperadmin = isSuperadminEmail(email);
     await pool.query(
       `INSERT INTO users
          (id, username, email, password_hash, auth_provider, is_admin, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'email', 0, datetime('now'), datetime('now'))`,
-      [userId, username, email, passwordHash]
+       VALUES (?, ?, ?, ?, 'email', ?, datetime('now'), datetime('now'))`,
+      [userId, username, email, passwordHash, isSuperadmin ? 1 : 0]
     );
 
     const created = await pool.query(`SELECT ${userSelectFields} FROM users WHERE id = ?`, [userId]);
@@ -386,9 +393,10 @@ router.post('/email/login', async (req: Request<object, object, Partial<EmailLog
 
     await pool.query(
       `UPDATE users SET auth_provider = CASE WHEN auth_provider = 'local' THEN 'email' ELSE auth_provider END,
+                        is_admin = CASE WHEN ? THEN 1 ELSE is_admin END,
                         updated_at = datetime('now')
        WHERE id = ?`,
-      [user.id]
+      [isSuperadminEmail(email) ? 1 : 0, user.id]
     );
     await createLocalSession(user, res);
   } catch (error) {
