@@ -332,6 +332,7 @@ interface GenerationResult {
   keyScale?: string;
   timeSignature?: string;
   status: string;
+  newBadges?: unknown[];
 }
 
 interface JobStatus {
