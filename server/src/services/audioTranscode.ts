@@ -1,8 +1,15 @@
 import { spawn } from 'node:child_process';
+import { describeFfmpegLookup, resolveFfmpegPath } from './ffmpeg.js';
 
 async function transcode(input: Buffer, args: string[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const ffmpegPath = resolveFfmpegPath();
+    if (!ffmpegPath) {
+      reject(new Error(`ffmpeg not found. ${describeFfmpegLookup()}`));
+      return;
+    }
+
+    const ffmpeg = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'pipe'] });
 
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];

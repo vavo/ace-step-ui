@@ -51,11 +51,23 @@ Use the exact generated RunPod proxy host. Also register the exact Google callba
 
 ## Required Environment
 
-The server expects `ffmpeg` on `PATH`. Install it before starting production:
+The server expects `ffmpeg` on `PATH`, in the ACE-Step venv, or at `FFMPEG_PATH`. Install it before starting production:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y ffmpeg
+```
+
+If the startup log still says `ffmpeg was not found`, point the app at the binary explicitly:
+
+```env
+FFMPEG_PATH=/usr/bin/ffmpeg
+```
+
+or, if your install put it inside ACE-Step:
+
+```env
+FFMPEG_PATH=/workspace/ACE-Step-1.5/.venv/bin/ffmpeg
 ```
 
 Without `ffmpeg`, FLAC playback fallback, uploaded-reference preparation, and browser-safe MP3 conversion can fail.
@@ -80,6 +92,8 @@ SUPERADMIN_EMAIL=owner@example.com
 PRODUCT_TIME_ZONE=Europe/Bratislava
 DATABASE_PATH=./server/data/acestep.db
 ACESTEP_API_URL=http://localhost:8001
+ACESTEP_PATH=/workspace/ACE-Step-1.5
+FFMPEG_PATH=/usr/bin/ffmpeg
 ```
 
 For a real deployment, use one HTTPS origin everywhere:

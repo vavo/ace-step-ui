@@ -1,7 +1,7 @@
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { config } from '../config/index.js';
+import { describeFfmpegLookup, resolveFfmpegPath } from './ffmpeg.js';
 
 function assertWritableDirectory(dir: string, label: string): void {
   mkdirSync(dir, { recursive: true });
@@ -21,10 +21,13 @@ function assertWritableDirectory(dir: string, label: string): void {
 }
 
 function warnIfFfmpegMissing(): void {
-  const result = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' });
-  if (result.status === 0) return;
+  const ffmpegPath = resolveFfmpegPath();
+  if (ffmpegPath) {
+    console.log(`[Startup] ffmpeg found: ${ffmpegPath}`);
+    return;
+  }
 
-  console.warn('[Startup] ffmpeg was not found on PATH. FLAC/MP3 fallback, reference preparation, and video/audio tools may fail.');
+  console.warn(`[Startup] ffmpeg was not found. FLAC/MP3 fallback, reference preparation, and video/audio tools may fail. ${describeFfmpegLookup()}`);
 }
 
 export function runStartupChecks(): void {

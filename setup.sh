@@ -52,6 +52,7 @@ DATABASE_PATH=./server/data/acestep.db
 ACESTEP_API_URL=http://localhost:8001
 ACESTEP_GRADIO_URL=
 ACESTEP_PATH=$ACESTEP_PATH
+FFMPEG_PATH=
 
 # Storage
 AUDIO_DIR=./public/audio

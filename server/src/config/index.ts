@@ -47,6 +47,7 @@ export const config = {
   acestep: {
     apiUrl: process.env.ACESTEP_API_URL || 'http://localhost:8001',
     gradioUrl: process.env.ACESTEP_GRADIO_URL || '',
+    path: process.env.ACESTEP_PATH || '',
   },
 
   // Pexels (optional - for video backgrounds)
