@@ -454,9 +454,11 @@ export interface GenerationJob {
   result?: {
     audioUrls: string[];
     bpm?: number;
+    estimatedBpm?: number;
     duration?: number;
     keyScale?: string;
     timeSignature?: string;
+    qualityWarnings?: string[];
   };
   error?: string;
 }

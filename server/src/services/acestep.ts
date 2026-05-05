@@ -417,8 +417,10 @@ interface GenerationResult {
   audioUrls: string[];
   duration: number;
   bpm?: number;
+  estimatedBpm?: number;
   keyScale?: string;
   timeSignature?: string;
+  qualityWarnings?: string[];
   status: string;
   newBadges?: unknown[];
 }
@@ -849,8 +851,10 @@ async function processGenerationViaPython(
       audioUrls,
       duration: finalDuration,
       bpm: params.bpm,
+      estimatedBpm: typeof result.estimated_bpm === 'number' ? result.estimated_bpm : undefined,
       keyScale: params.keyScale,
       timeSignature: params.timeSignature,
+      qualityWarnings: Array.isArray(result.quality_warnings) ? result.quality_warnings : [],
       status: 'succeeded',
     };
     job.rawResponse = result;

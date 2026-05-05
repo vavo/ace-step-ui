@@ -78,6 +78,43 @@ def get_handlers(dit_model: str = "acestep-v15-turbo", thinking: bool = False, l
             print(f"ACE-Step LM {lm_model} unavailable: {status}", file=sys.stderr)
     return _handler, _llm_handler
 
+def estimate_audio_bpm(audio_path: str, target_bpm: int = 0):
+    """Best-effort BPM estimate. Never blocks generation if optional deps are missing."""
+    try:
+        import librosa
+        import numpy as np
+
+        y, sr = librosa.load(audio_path, sr=22050, mono=True, duration=120)
+        if y is None or len(y) < sr:
+            return None
+
+        tempo, _beats = librosa.beat.beat_track(y=y, sr=sr)
+        if isinstance(tempo, np.ndarray):
+            tempo = float(tempo.flatten()[0]) if tempo.size else 0.0
+        else:
+            tempo = float(tempo)
+        if tempo <= 0:
+            return None
+
+        candidates = [tempo, tempo * 2, tempo / 2, tempo * 4, tempo / 4]
+        candidates = [candidate for candidate in candidates if 40 <= candidate <= 240]
+        if target_bpm and target_bpm > 0 and candidates:
+            tempo = min(candidates, key=lambda candidate: abs(candidate - target_bpm))
+        return round(float(tempo), 1)
+    except Exception as exc:
+        print(f"BPM estimate skipped for {audio_path}: {exc}", file=sys.stderr)
+        return None
+
+def build_quality_warnings(target_bpm: int, estimated_bpm):
+    warnings = []
+    if target_bpm and target_bpm > 0 and estimated_bpm:
+        drift = abs(float(estimated_bpm) - float(target_bpm))
+        if drift > max(8.0, target_bpm * 0.08):
+            warnings.append(
+                f"Requested {target_bpm} BPM, detected roughly {estimated_bpm:.0f} BPM. The model may have ignored the tempo."
+            )
+    return warnings
+
 def generate(
     # Basic parameters
     prompt: str,
@@ -199,11 +236,16 @@ def generate(
             if isinstance(audio, dict) and audio.get("path"):
                 audio_paths.append(audio["path"])
 
+    estimated_bpm = estimate_audio_bpm(audio_paths[0], bpm) if audio_paths else None
+    quality_warnings = build_quality_warnings(bpm, estimated_bpm)
+
     return {
         "success": True,
         "audio_paths": audio_paths,
         "elapsed_seconds": elapsed,
         "output_dir": output_dir,
+        "estimated_bpm": estimated_bpm,
+        "quality_warnings": quality_warnings,
     }
 
 def main():

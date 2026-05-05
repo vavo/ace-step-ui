@@ -425,6 +425,7 @@ const enTranslations: TranslationBundle = {
     presetAdvancedHint: 'Base model for manual/experimental workflows.',
     strictPromptDetected: 'Strict prompt detected: genre, language, vocal and BPM hints will be locked and ACE-Step caption rewriting will be reduced.',
     lmUnavailableWarning: 'LM planning is selected, but no ACE-Step LM checkpoint is visible on the server. Generation can still run, but CoT planning may be skipped.',
+    bpmDriftWarning: 'Requested {requested} BPM, detected about {detected} BPM. The model probably ignored the tempo.',
     
     // CreatePanel - Transcription
     transcribing: 'Transcribing...',
@@ -1635,6 +1636,7 @@ export const translations: Record<string, TranslationBundle> = {
     presetAdvancedHint: 'Base model pre manuálne a experimentálne workflow.',
     strictPromptDetected: 'Rozpoznaný striktný prompt: žáner, jazyk, vokál a BPM sa uzamknú a ACE-Step prepis captionu sa obmedzí.',
     lmUnavailableWarning: 'LM plánovanie je zapnuté, ale server nevidí žiadny ACE-Step LM checkpoint. Generovanie pôjde ďalej, ale CoT plánovanie sa môže preskočiť.',
+    bpmDriftWarning: 'Chcel si {requested} BPM, detekcia ukazuje približne {detected} BPM. Model tempo pravdepodobne odignoroval.',
     lmModelLabel: 'LM model',
     lmNegativePrompt: 'LM negatívny prompt',
     lmParameters: 'Parametre LM',

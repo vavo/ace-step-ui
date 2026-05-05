@@ -29,6 +29,7 @@ import {
 } from '../services/credits.js';
 import { recordPublishedSong } from '../services/gamification.js';
 import { transcodeToMp3 } from '../services/audioTranscode.js';
+import { buildStyleProfilePrompt, findStyleProfile } from '../data/styleProfiles.js';
 
 const router = Router();
 
@@ -904,12 +905,14 @@ interface GenerateBody {
 }
 
 type LockedGenerationConstraints = {
+  styleProfile?: string;
   genres: string[];
   language?: string;
   vocalGender?: 'male' | 'female';
   vocalTone: string[];
   mood: string[];
   bpm?: number;
+  bpmRange?: [number, number];
   duration?: number;
   keyScale?: string;
   timeSignature?: string;
@@ -975,30 +978,44 @@ function compileGenerationParams(input: GenerateBody): CompiledGenerateBody {
     keyScale: input.keyScale,
     timeSignature: input.timeSignature,
   });
+  const styleProfile = findStyleProfile(compilerCaption);
   const strictMode = Boolean(input.strictMode || hasExplicitGenerationIntent(intent));
   const captionLanguage = inferCaptionOutputLanguage({ caption: compilerCaption, lyrics: lyricsSource });
-  const compiledCaption = strictMode && compilerCaption
+  const baseCompiledCaption = strictMode && compilerCaption
     ? buildLocalizedIntentCaption(intent, compilerCaption, captionLanguage)
     : captionSource;
+  const profilePrompt = styleProfile ? buildStyleProfilePrompt(styleProfile) : '';
+  const compiledCaption = profilePrompt
+    ? `${profilePrompt} ${baseCompiledCaption || compilerCaption}`.trim()
+    : baseCompiledCaption;
   const lockedConstraints = buildLockedConstraints(intent);
-  const explicitMetadata = Boolean(intent.bpm || intent.duration || intent.keyScale || intent.timeSignature);
+  const effectiveBpm = intent.bpm ?? input.bpm ?? styleProfile?.defaultBpm;
+  const effectiveKeyScale = intent.keyScale || input.keyScale || styleProfile?.defaultKeyScale;
+  const effectiveTimeSignature = intent.timeSignature || input.timeSignature || styleProfile?.timeSignature;
+  const effectivePreset = input.modelPreset || styleProfile?.preferredPreset || 'quality';
+  const explicitMetadata = Boolean(effectiveBpm || intent.duration || effectiveKeyScale || effectiveTimeSignature);
   const compiledInstrumental = intent.mustBeVocal ? false : Boolean(input.instrumental || intent.instrumental);
+  lockedConstraints.styleProfile = styleProfile?.id;
+  lockedConstraints.bpm = effectiveBpm;
+  lockedConstraints.bpmRange = styleProfile?.bpmRange;
+  lockedConstraints.keyScale = effectiveKeyScale;
+  lockedConstraints.timeSignature = effectiveTimeSignature;
   lockedConstraints.instrumental = compiledInstrumental;
-  const preset = input.modelPreset || 'quality';
+  const preset = effectivePreset;
   const ditModel = input.ditModel || defaultModelForPreset(preset);
   const turboModel = ditModel.includes('turbo');
 
   return {
     ...input,
     songDescription: input.customMode ? input.songDescription : (compiledCaption || input.songDescription),
-    style: input.customMode ? (compiledCaption || input.style) : input.style,
+    style: input.customMode ? (compiledCaption || input.style) : (input.style || compiledCaption),
     lyrics: lyricsSource,
     instrumental: compiledInstrumental,
     vocalLanguage: intent.language?.code || input.vocalLanguage,
     duration: intent.duration ?? input.duration,
-    bpm: intent.bpm ?? input.bpm,
-    keyScale: intent.keyScale || input.keyScale,
-    timeSignature: intent.timeSignature || input.timeSignature,
+    bpm: effectiveBpm,
+    keyScale: effectiveKeyScale,
+    timeSignature: effectiveTimeSignature,
     useCotMetas: explicitMetadata ? false : input.useCotMetas,
     useCotCaption: strictMode ? false : input.useCotCaption,
     useCotLanguage: intent.language ? false : input.useCotLanguage,

@@ -854,6 +854,19 @@ function AppContent() {
         if (status.status === 'succeeded' && status.result) {
           cleanupJob(jobId, tempId);
           await refreshSongsList();
+          if (Array.isArray(status.result.qualityWarnings) && status.result.qualityWarnings.length > 0) {
+            showToast(status.result.qualityWarnings[0], 'info');
+          } else if (status.result.bpm && status.result.estimatedBpm) {
+            const drift = Math.abs(status.result.estimatedBpm - status.result.bpm);
+            if (drift > Math.max(8, status.result.bpm * 0.08)) {
+              showToast(
+                t('bpmDriftWarning')
+                  .replace('{requested}', String(Math.round(status.result.bpm)))
+                  .replace('{detected}', String(Math.round(status.result.estimatedBpm))),
+                'info'
+              );
+            }
+          }
 
           if (window.innerWidth < 768) {
             setMobileShowList(true);
@@ -931,6 +944,9 @@ function AppContent() {
         lyrics: params.lyrics,
         style: params.style,
         title: params.title,
+        ditModel: params.ditModel,
+        modelPreset: params.modelPreset,
+        strictMode: params.strictMode,
         instrumental: params.instrumental,
         vocalLanguage: params.vocalLanguage,
         duration: params.duration && params.duration > 0 ? params.duration : undefined,
