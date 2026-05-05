@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 import { config } from '../config/index.js';
 import { getGradioClient, resetGradioClient, isAceStepApiAvailable, isGradioAvailable } from './gradio-client.js';
 import { transcodeToWav } from './audioTranscode.js';
+import { resolveFfmpegPath } from './ffmpeg.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -163,8 +164,16 @@ async function prepareAudioFile(audioUrl: string | undefined): Promise<unknown> 
     let buffer: Buffer = await readFile(filePath);
     let ext = path.extname(filePath).toLowerCase();
     if (shouldConvertForAceStep(filePath)) {
-      buffer = await transcodeToWav(buffer);
-      ext = '.wav';
+      if (resolveFfmpegPath()) {
+        try {
+          buffer = await transcodeToWav(buffer);
+          ext = '.wav';
+        } catch (error) {
+          console.warn(`[Gradio] Failed to convert audio to WAV, using original file: ${filePath}`, error);
+        }
+      } else {
+        console.warn(`[Gradio] ffmpeg not available; using original audio file: ${filePath}`);
+      }
     }
     const mimeMap: Record<string, string> = {
       '.flac': 'audio/flac', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
@@ -190,11 +199,21 @@ async function preparePythonAudioPath(audioUrl: string, jobOutputDir: string, la
     return filePath;
   }
 
+  if (!resolveFfmpegPath()) {
+    console.warn(`[ACE-Step] ffmpeg not available; using original ${label} audio file: ${filePath}`);
+    return filePath;
+  }
+
   const buffer = await readFile(filePath);
-  const wav = await transcodeToWav(buffer);
-  const convertedPath = path.join(jobOutputDir, `${label}.wav`);
-  await writeFile(convertedPath, wav);
-  return convertedPath;
+  try {
+    const wav = await transcodeToWav(buffer);
+    const convertedPath = path.join(jobOutputDir, `${label}.wav`);
+    await writeFile(convertedPath, wav);
+    return convertedPath;
+  } catch (error) {
+    console.warn(`[ACE-Step] Failed to convert ${label} audio to WAV, using original file: ${filePath}`, error);
+    return filePath;
+  }
 }
 
 /**
