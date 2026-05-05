@@ -313,6 +313,12 @@ type ExtractedFormatIntent = {
 
 const GENRE_RULES: IntentRule[] = [
   {
+    label: 'hard techno',
+    phrase: 'hard techno track with relentless industrial kick drums, distorted rumble bass, tense rave stabs, and high-pressure warehouse energy',
+    patterns: [/hard\s+techno/, /tvrde\s+techno/, /tvrd[yae]\s+techno/],
+    conflicts: [/\bslow\b/, /pomal/, /\bchiptune\b/, /\b8-bit\b/, /8bit/, /video\s*game/, /\bmeme\b/, /\bklezmer\b/, /\bbalkan\b/, /\baccordion\b/],
+  },
+  {
     label: 'jungle / drum and bass',
     phrase: 'jungle / drum and bass song with fast breakbeats, rolling sub-bass, syncopated percussion, and atmospheric pads',
     patterns: [/\bjungle\b/, /\bdnb\b/, /drum\s*(and|&)\s*bass/],
@@ -478,11 +484,6 @@ function buildIntentCaption(intent: ExtractedFormatIntent, originalCaption: stri
     parts.push(`Mood and emotion: ${intent.moodRules.map(rule => rule.phrase).join(', ')}.`);
   }
 
-  if (intent.bpm) parts.push(`Tempo: around ${intent.bpm} BPM.`);
-  if (intent.duration) parts.push(`Target duration: around ${intent.duration} seconds.`);
-  if (intent.keyScale) parts.push(`Key: ${intent.keyScale}.`);
-  if (intent.timeSignature) parts.push(`Time signature: ${intent.timeSignature}.`);
-
   parts.push('Do not add unrelated genres, novelty sound effects, meme elements, or instrumentation that contradicts the user request.');
   return parts.join(' ');
 }
@@ -512,11 +513,6 @@ function buildSlovakIntentCaption(intent: ExtractedFormatIntent, originalCaption
     parts.push(`Nálada: ${intent.moodRules.map(rule => rule.label).join(', ')}.`);
   }
 
-  if (intent.bpm) parts.push(`Tempo: približne ${intent.bpm} BPM.`);
-  if (intent.duration) parts.push(`Cieľová dĺžka: približne ${intent.duration} sekúnd.`);
-  if (intent.keyScale) parts.push(`Tónina: ${intent.keyScale}.`);
-  if (intent.timeSignature) parts.push(`Takt: ${intent.timeSignature}.`);
-
   parts.push('Nepridávaj nesúvisiace žánre, meme prvky, novelty zvuky ani nástroje, ktoré odporujú zadaniu.');
   return parts.join(' ');
 }
@@ -545,11 +541,6 @@ function buildCzechIntentCaption(intent: ExtractedFormatIntent, originalCaption:
   if (intent.moodRules.length > 0) {
     parts.push(`Nálada: ${intent.moodRules.map(rule => rule.label).join(', ')}.`);
   }
-
-  if (intent.bpm) parts.push(`Tempo: přibližně ${intent.bpm} BPM.`);
-  if (intent.duration) parts.push(`Cílová délka: přibližně ${intent.duration} sekund.`);
-  if (intent.keyScale) parts.push(`Tónina: ${intent.keyScale}.`);
-  if (intent.timeSignature) parts.push(`Takt: ${intent.timeSignature}.`);
 
   parts.push('Nepřidávej nesouvisející žánry, meme prvky, novelty zvuky ani nástroje, které odporují zadání.');
   return parts.join(' ');
@@ -908,6 +899,122 @@ interface GenerateBody {
 
   // Model selection
   ditModel?: string;
+  modelPreset?: 'fast' | 'quality' | 'advanced';
+  strictMode?: boolean;
+}
+
+type LockedGenerationConstraints = {
+  genres: string[];
+  language?: string;
+  vocalGender?: 'male' | 'female';
+  vocalTone: string[];
+  mood: string[];
+  bpm?: number;
+  duration?: number;
+  keyScale?: string;
+  timeSignature?: string;
+  instrumental: boolean;
+};
+
+type CompiledGenerateBody = GenerateBody & {
+  lockedConstraints?: LockedGenerationConstraints;
+  promptCompiler?: {
+    strictMode: boolean;
+    originalCaption: string;
+    compiledCaption: string;
+    lockedConstraints: LockedGenerationConstraints;
+  };
+};
+
+function hasExplicitGenerationIntent(intent: ExtractedFormatIntent): boolean {
+  return Boolean(
+    intent.genres.length > 0 ||
+    intent.language ||
+    intent.vocalGender ||
+    intent.vocalToneRules.length > 0 ||
+    intent.moodRules.length > 0 ||
+    intent.bpm ||
+    intent.duration ||
+    intent.keyScale ||
+    intent.timeSignature ||
+    intent.instrumental ||
+    intent.mustBeVocal
+  );
+}
+
+function buildLockedConstraints(intent: ExtractedFormatIntent): LockedGenerationConstraints {
+  return {
+    genres: intent.genres.map(rule => rule.label),
+    language: intent.language?.code,
+    vocalGender: intent.vocalGender,
+    vocalTone: intent.vocalToneRules.map(rule => rule.label),
+    mood: intent.moodRules.map(rule => rule.label),
+    bpm: intent.bpm,
+    duration: intent.duration,
+    keyScale: intent.keyScale,
+    timeSignature: intent.timeSignature,
+    instrumental: intent.instrumental,
+  };
+}
+
+function defaultModelForPreset(preset: GenerateBody['modelPreset']): string {
+  if (preset === 'fast') return 'acestep-v15-turbo';
+  if (preset === 'advanced') return 'acestep-v15-base';
+  return 'acestep-v15-sft';
+}
+
+function compileGenerationParams(input: GenerateBody): CompiledGenerateBody {
+  const captionSource = (input.customMode ? (input.style || input.songDescription || '') : (input.songDescription || input.style || '')).trim();
+  const lyricsSource = input.lyrics || '';
+  const compilerCaption = captionSource || lyricsSource;
+  const intent = extractFormatIntent({
+    caption: compilerCaption,
+    lyrics: lyricsSource,
+    bpm: input.bpm,
+    duration: input.duration,
+    keyScale: input.keyScale,
+    timeSignature: input.timeSignature,
+  });
+  const strictMode = Boolean(input.strictMode || hasExplicitGenerationIntent(intent));
+  const captionLanguage = inferCaptionOutputLanguage({ caption: compilerCaption, lyrics: lyricsSource });
+  const compiledCaption = strictMode && compilerCaption
+    ? buildLocalizedIntentCaption(intent, compilerCaption, captionLanguage)
+    : captionSource;
+  const lockedConstraints = buildLockedConstraints(intent);
+  const explicitMetadata = Boolean(intent.bpm || intent.duration || intent.keyScale || intent.timeSignature);
+  const compiledInstrumental = intent.mustBeVocal ? false : Boolean(input.instrumental || intent.instrumental);
+  lockedConstraints.instrumental = compiledInstrumental;
+  const preset = input.modelPreset || 'quality';
+  const ditModel = input.ditModel || defaultModelForPreset(preset);
+  const turboModel = ditModel.includes('turbo');
+
+  return {
+    ...input,
+    songDescription: input.customMode ? input.songDescription : (compiledCaption || input.songDescription),
+    style: input.customMode ? (compiledCaption || input.style) : input.style,
+    lyrics: lyricsSource,
+    instrumental: compiledInstrumental,
+    vocalLanguage: intent.language?.code || input.vocalLanguage,
+    duration: intent.duration ?? input.duration,
+    bpm: intent.bpm ?? input.bpm,
+    keyScale: intent.keyScale || input.keyScale,
+    timeSignature: intent.timeSignature || input.timeSignature,
+    useCotMetas: explicitMetadata ? false : input.useCotMetas,
+    useCotCaption: strictMode ? false : input.useCotCaption,
+    useCotLanguage: intent.language ? false : input.useCotLanguage,
+    ditModel,
+    inferenceSteps: input.inferenceSteps ?? (turboModel ? 8 : 50),
+    guidanceScale: input.guidanceScale ?? (turboModel ? 1 : 8),
+    useAdg: input.useAdg ?? (preset === 'advanced' && ditModel.includes('base')),
+    strictMode,
+    lockedConstraints,
+    promptCompiler: {
+      strictMode,
+      originalCaption: captionSource,
+      compiledCaption,
+      lockedConstraints,
+    },
+  };
 }
 
 router.post('/upload-audio', authMiddleware, (req: AuthenticatedRequest, res: Response, next: Function) => {
@@ -1025,6 +1132,8 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       completeTrackClasses,
       isFormatCaption,
       ditModel,
+      modelPreset,
+      strictMode,
     } = req.body as GenerateBody;
 
     if (!customMode && !songDescription) {
@@ -1037,7 +1146,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       return;
     }
 
-    const params = {
+    const params = compileGenerationParams({
       customMode,
       songDescription,
       lyrics,
@@ -1093,9 +1202,11 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       completeTrackClasses,
       isFormatCaption,
       ditModel,
-    };
+      modelPreset,
+      strictMode,
+    });
 
-    creditCost = calculateGenerationCreditCost(batchSize);
+    creditCost = calculateGenerationCreditCost(params.batchSize);
     const creditSummary = getCreditSummary(req.user!.id);
     if (!creditSummary.unlimited && creditSummary.balance < creditCost) {
       res.status(402).json({
@@ -1119,7 +1230,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       amount: creditCost,
       referenceType: 'generation_job',
       referenceId: localJobId,
-      metadata: { batchSize: batchSize || 1 },
+      metadata: { batchSize: params.batchSize || 1 },
     });
     creditsReserved = true;
 
@@ -1479,9 +1590,17 @@ router.get('/models', async (_req, res: Response) => {
       'acestep-v15-turbo',             // default, from main model repo
       'acestep-v15-base',              // submodel
       'acestep-v15-sft',               // submodel
+      'acestep-v15-xl-base',           // XL submodel
+      'acestep-v15-xl-sft',            // XL submodel
+      'acestep-v15-xl-turbo',          // XL submodel
       'acestep-v15-turbo-shift1',      // submodel
       'acestep-v15-turbo-shift3',      // submodel
       'acestep-v15-turbo-continuous',   // submodel
+    ];
+    const ALL_LM_MODELS = [
+      'acestep-5Hz-lm-0.6B',
+      'acestep-5Hz-lm-1.7B',
+      'acestep-5Hz-lm-4B',
     ];
 
     // Query Gradio /v1/models to get the currently loaded/active model
@@ -1531,6 +1650,13 @@ router.get('/models', async (_req, res: Response) => {
       is_active: name === activeModel,
       is_preloaded: downloaded.has(name),
     }));
+    const lmModels = ALL_LM_MODELS.filter(name => {
+      try {
+        return existsSync(path.join(checkpointsDir, name)) && statSync(path.join(checkpointsDir, name)).isDirectory();
+      } catch {
+        return false;
+      }
+    });
 
     // Sort: active first, then downloaded, then alphabetical
     models.sort((a, b) => {
@@ -1539,7 +1665,7 @@ router.get('/models', async (_req, res: Response) => {
       return a.name.localeCompare(b.name);
     });
 
-    res.json({ models });
+    res.json({ models, lm: { available: lmModels.length > 0, models: lmModels } });
   } catch (error) {
     console.error('Models error:', error);
     res.json({
@@ -1547,6 +1673,9 @@ router.get('/models', async (_req, res: Response) => {
         'acestep-v15-turbo',
         'acestep-v15-base',
         'acestep-v15-sft',
+        'acestep-v15-xl-base',
+        'acestep-v15-xl-sft',
+        'acestep-v15-xl-turbo',
         'acestep-v15-turbo-shift1',
         'acestep-v15-turbo-shift3',
         'acestep-v15-turbo-continuous',
@@ -1556,6 +1685,7 @@ router.get('/models', async (_req, res: Response) => {
         is_preloaded: false,
       })),
       fallback: true,
+      lm: { available: false, models: [] },
       error: error instanceof Error ? error.message : 'Failed to load models',
     });
   }

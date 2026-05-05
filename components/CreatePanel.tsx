@@ -92,6 +92,61 @@ function readStoredInt(key: string, fallback: number, min: number, max: number):
   return clampInt(localStorage.getItem(key), fallback, min, max);
 }
 
+type GenerationPreset = 'fast' | 'quality' | 'advanced';
+
+const MODEL_PRESET_ORDER: Record<GenerationPreset, string[]> = {
+  fast: ['acestep-v15-xl-turbo', 'acestep-v15-turbo-shift3', 'acestep-v15-turbo', 'acestep-v15-turbo-continuous'],
+  quality: ['acestep-v15-xl-sft', 'acestep-v15-sft', 'acestep-v15-xl-turbo', 'acestep-v15-turbo-shift3', 'acestep-v15-turbo'],
+  advanced: ['acestep-v15-xl-base', 'acestep-v15-base', 'acestep-v15-xl-sft', 'acestep-v15-sft'],
+};
+
+function chooseModelForPreset(preset: GenerationPreset, models: { id: string; name: string }[]): string {
+  const modelIds = models.map(model => model.id);
+  return MODEL_PRESET_ORDER[preset].find(id => modelIds.includes(id)) || modelIds[0] || 'acestep-v15-sft';
+}
+
+function presetForModel(modelId: string): GenerationPreset {
+  if (modelId.includes('base')) return 'advanced';
+  if (modelId.includes('sft')) return 'quality';
+  return 'fast';
+}
+
+function isTurboModelId(modelId: string): boolean {
+  return modelId.includes('turbo');
+}
+
+function getInitialModel(): string {
+  return localStorage.getItem('ace-model') || 'acestep-v15-sft';
+}
+
+function getInitialPreset(): GenerationPreset {
+  const stored = localStorage.getItem('ace-generation-preset') as GenerationPreset | null;
+  if (stored === 'fast' || stored === 'quality' || stored === 'advanced') return stored;
+  return presetForModel(getInitialModel());
+}
+
+function detectStrictPromptSignal(text: string, explicitBpm: number) {
+  const source = text.toLowerCase();
+  const bpmMatch = source.match(/\b([6-9]\d|1\d{2}|2[0-4]\d|250)\s*bpm\b/);
+  const detectedBpm = Number.isFinite(explicitBpm) && explicitBpm > 0 ? explicitBpm : bpmMatch ? Number(bpmMatch[1]) : 0;
+  const language =
+    /(slovak|sloven[cč]in|slovensky|sloven[cč]ine)/.test(source) ? 'sk' :
+    /(czech|cesk|česk|cestin|češtin)/.test(source) ? 'cs' :
+    /(english|anglick)/.test(source) ? 'en' :
+    '';
+  const hasGenre = /\b(hard\s+techno|techno|jungle|dnb|drum\s*(and|&)\s*bass|hip\s*hop|hip-hop|rap|trap|rock|metal|punk|folk|house|pop)\b/.test(source);
+  const hasVocal = /\b(vocal|vocals|voice|hlas|vokal|vokál|spev|female|male|zensky|žensk|muzsk|mužsk|chraplav|zachrip)\b/.test(source);
+  const hasMood = /\b(dark|temn|sad|smutn|melanchol|happy|vesel|angry|nahnevan|agresiv|energetic|energick|romantic|romantick)\b/.test(source);
+  const hasExplicitMetadata = Boolean(detectedBpm || language);
+  return {
+    strictMode: Boolean(hasGenre || hasVocal || hasMood || hasExplicitMetadata),
+    bpm: detectedBpm || undefined,
+    language,
+    hasExplicitMetadata,
+    hasLanguage: Boolean(language),
+  };
+}
+
 export const CreatePanel: React.FC<CreatePanelProps> = ({
   onGenerate,
   onInsufficientCredits,
@@ -155,13 +210,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const [isClaimingCredits, setIsClaimingCredits] = useState(false);
   const [creditMessage, setCreditMessage] = useState<string | null>(null);
-  const [guidanceScale, setGuidanceScale] = useState(9.0);
+  const [guidanceScale, setGuidanceScale] = useState(() => isTurboModelId(getInitialModel()) ? 1.0 : 8.0);
   const [randomSeed, setRandomSeed] = useState(true);
   const [seed, setSeed] = useState(-1);
-  const [thinking, setThinking] = useState(false); // Default false for GPU compatibility
+  const [thinking, setThinking] = useState(() => getInitialPreset() === 'quality');
   const [enhance, setEnhance] = useState(false); // AI Enhance: uses LLM to enrich caption & generate metadata
   const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>('mp3');
-  const [inferenceSteps, setInferenceSteps] = useState(12);
+  const [inferenceSteps, setInferenceSteps] = useState(() => isTurboModelId(getInitialModel()) ? 8 : 50);
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
   const [lmBackend, setLmBackend] = useState<'pt' | 'vllm'>('pt');
   const [lmModel, setLmModel] = useState(() => {
@@ -222,14 +277,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Model selection
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return localStorage.getItem('ace-model') || 'acestep-v15-turbo-shift3';
+    return getInitialModel();
   });
+  const [generationPreset, setGenerationPreset] = useState<GenerationPreset>(() => getInitialPreset());
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const previousModelRef = useRef<string>(selectedModel);
   
   // Available models fetched from backend
   const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
+  const [lmAvailability, setLmAvailability] = useState<{ available: boolean; models: string[] }>({ available: false, models: [] });
 
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
@@ -239,6 +296,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     return [
       { id: 'acestep-v15-base', name: 'acestep-v15-base' },
       { id: 'acestep-v15-sft', name: 'acestep-v15-sft' },
+      { id: 'acestep-v15-xl-base', name: 'acestep-v15-xl-base' },
+      { id: 'acestep-v15-xl-sft', name: 'acestep-v15-xl-sft' },
+      { id: 'acestep-v15-xl-turbo', name: 'acestep-v15-xl-turbo' },
       { id: 'acestep-v15-turbo', name: 'acestep-v15-turbo' },
       { id: 'acestep-v15-turbo-shift1', name: 'acestep-v15-turbo-shift1' },
       { id: 'acestep-v15-turbo-shift3', name: 'acestep-v15-turbo-shift3' },
@@ -251,6 +311,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     const mapping: Record<string, string> = {
       'acestep-v15-base': '1.5B',
       'acestep-v15-sft': '1.5S',
+      'acestep-v15-xl-base': '1.5XLB',
+      'acestep-v15-xl-sft': '1.5XLS',
+      'acestep-v15-xl-turbo': '1.5XLT',
       'acestep-v15-turbo-shift1': '1.5TS1',
       'acestep-v15-turbo-shift3': '1.5TS3',
       'acestep-v15-turbo-continuous': '1.5TC',
@@ -261,8 +324,40 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
 
   // Check if model is a turbo variant
   const isTurboModel = (modelId: string): boolean => {
-    return modelId.includes('turbo');
+    return isTurboModelId(modelId);
   };
+
+  const applyModelDefaults = useCallback((modelId: string, preset: GenerationPreset = presetForModel(modelId)) => {
+    if (preset === 'fast' || isTurboModel(modelId)) {
+      setInferenceSteps(8);
+      setGuidanceScale(1);
+      setUseAdg(false);
+      setThinking(false);
+      return;
+    }
+    if (preset === 'quality') {
+      setInferenceSteps(50);
+      setGuidanceScale(8);
+      setUseAdg(false);
+      setThinking(true);
+      setLmModel('acestep-5Hz-lm-1.7B');
+      localStorage.setItem('ace-lmModel', 'acestep-5Hz-lm-1.7B');
+      return;
+    }
+    setInferenceSteps(50);
+    setGuidanceScale(8);
+    setUseAdg(modelId.includes('base'));
+    setThinking(false);
+  }, []);
+
+  const applyGenerationPreset = useCallback((preset: GenerationPreset, models = availableModels) => {
+    const nextModel = chooseModelForPreset(preset, models);
+    setGenerationPreset(preset);
+    localStorage.setItem('ace-generation-preset', preset);
+    setSelectedModel(nextModel);
+    localStorage.setItem('ace-model', nextModel);
+    applyModelDefaults(nextModel, preset);
+  }, [applyModelDefaults, availableModels]);
 
   const [isUploadingReference, setIsUploadingReference] = useState(false);
   const [isUploadingSource, setIsUploadingSource] = useState(false);
@@ -631,20 +726,29 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       if (modelsRes.ok) {
         const data = await modelsRes.json();
         const models = data.models || [];
+        setLmAvailability({
+          available: Boolean(data.lm?.available),
+          models: Array.isArray(data.lm?.models) ? data.lm.models : [],
+        });
         if (models.length > 0) {
           setFetchedModels(models);
-          // Always sync to the backend's active model
+          const modelOptions = models.map((model: any) => ({ id: model.name, name: model.name }));
+          const modelIds = modelOptions.map((model: any) => model.id);
+          const storedModel = localStorage.getItem('ace-model');
           const active = models.find((m: any) => m.is_active);
-          if (active) {
-            setSelectedModel(active.name);
-            localStorage.setItem('ace-model', active.name);
+          const nextModel = storedModel && modelIds.includes(storedModel)
+            ? storedModel
+            : chooseModelForPreset(generationPreset, modelOptions) || active?.name;
+          if (nextModel) {
+            setSelectedModel(nextModel);
+            localStorage.setItem('ace-model', nextModel);
           }
         }
       }
     } catch {
       // ignore - will use fallback model list
     }
-  }, []);
+  }, [generationPreset]);
 
   useEffect(() => {
     const loadModelsAndLimits = async () => {
@@ -667,7 +771,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
     };
 
     loadModelsAndLimits();
-  }, []);
+  }, [refreshModels]);
 
   // Re-fetch models after generation completes to update active model
   const prevIsGeneratingRef = useRef(isGenerating);
@@ -1097,6 +1201,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const safeBulkCount = clampInt(bulkCount, 1, 1, 10);
   const generationCreditCost = safeBatchSize * safeBulkCount * (creditInfo?.costs.generationVariation ?? 20);
   const hasEnoughCredits = !creditInfo || Boolean(creditInfo.unlimited) || creditInfo.balance >= generationCreditCost;
+  const currentPromptSignal = useMemo(() => {
+    const promptText = customMode ? `${style}\n${lyrics}` : songDescription;
+    return detectStrictPromptSignal(promptText, bpm);
+  }, [customMode, style, lyrics, songDescription, bpm]);
+  const showLmUnavailableWarning = (thinking || enhance) && !lmAvailability.available;
 
   const handleGenerate = () => {
     if (!hasEnoughCredits) {
@@ -1111,6 +1220,15 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       const trimmed = style.trim();
       return trimmed ? `${trimmed}\n${genderHint}` : genderHint;
     })();
+    const submitPromptSignal = detectStrictPromptSignal(
+      customMode ? `${styleWithGender}\n${lyrics}` : songDescription,
+      bpm
+    );
+    const effectiveBpm = bpm > 0 ? bpm : (submitPromptSignal.bpm || 0);
+    const effectiveVocalLanguage = submitPromptSignal.language || vocalLanguage;
+    const effectiveUseCotMetas = submitPromptSignal.hasExplicitMetadata ? false : useCotMetas;
+    const effectiveUseCotCaption = submitPromptSignal.strictMode ? false : useCotCaption;
+    const effectiveUseCotLanguage = submitPromptSignal.hasLanguage ? false : useCotLanguage;
 
     // Bulk generation: loop bulkCount times
     for (let i = 0; i < safeBulkCount; i++) {
@@ -1131,9 +1249,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         style: styleWithGender,
         title: safeBulkCount > 1 ? `${title} (${i + 1})` : title,
         ditModel: selectedModel,
+        modelPreset: generationPreset,
+        strictMode: submitPromptSignal.strictMode,
         instrumental,
-        vocalLanguage,
-        bpm,
+        vocalLanguage: effectiveVocalLanguage,
+        bpm: effectiveBpm,
         keyScale,
         timeSignature,
         duration,
@@ -1168,9 +1288,9 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         cfgIntervalStart,
         cfgIntervalEnd,
         customTimesteps: customTimesteps.trim() || undefined,
-        useCotMetas,
-        useCotCaption,
-        useCotLanguage,
+        useCotMetas: effectiveUseCotMetas,
+        useCotCaption: effectiveUseCotCaption,
+        useCotLanguage: effectiveUseCotLanguage,
         autogen,
         constrainedDecodingDebug,
         allowLmBatch,
@@ -1284,6 +1404,23 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
               </button>
             </div>
 
+            <div className="hidden sm:flex items-center bg-zinc-200 dark:bg-black/40 rounded-lg p-1 border border-zinc-300 dark:border-white/5">
+              {(['fast', 'quality', 'advanced'] as GenerationPreset[]).map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => applyGenerationPreset(preset)}
+                  title={t(`preset${preset[0].toUpperCase()}${preset.slice(1)}Hint` as any)}
+                  className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
+                    generationPreset === preset
+                      ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  {t(`preset${preset[0].toUpperCase()}${preset.slice(1)}` as any)}
+                </button>
+              ))}
+            </div>
+
             {/* Model Selection */}
             {showAdvanced && (
             <div className="relative" ref={modelMenuRef}>
@@ -1306,11 +1443,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                         onClick={() => {
                           setSelectedModel(model.id);
                           localStorage.setItem('ace-model', model.id);
-                          // Auto-adjust parameters for non-turbo models
-                          if (!isTurboModel(model.id)) {
-                            setInferenceSteps(20);
-                            setUseAdg(true);
-                          }
+                          const inferredPreset = presetForModel(model.id);
+                          setGenerationPreset(inferredPreset);
+                          localStorage.setItem('ace-generation-preset', inferredPreset);
+                          applyModelDefaults(model.id, inferredPreset);
                           setShowModelMenu(false);
                         }}
                         className={`w-full px-4 py-3 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-b-0 ${
@@ -1346,6 +1482,21 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
             )}
           </div>
         </div>
+
+        {(currentPromptSignal.strictMode || showLmUnavailableWarning) && (
+          <div className="space-y-2">
+            {currentPromptSignal.strictMode && (
+              <div className="rounded-xl border border-emerald-300/50 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-200">
+                {t('strictPromptDetected')}
+              </div>
+            )}
+            {showLmUnavailableWarning && (
+              <div className="rounded-xl border border-amber-300/60 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                {t('lmUnavailableWarning')}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* SIMPLE MODE */}
         {!customMode && (

@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import torch
+from pathlib import Path
 
 # Get ACE-Step path from environment or use default
 ACESTEP_PATH = os.environ.get('ACESTEP_PATH', '/home/ambsd/Desktop/aceui/ACE-Step-1.5')
@@ -20,14 +21,17 @@ sys.path.insert(0, ACESTEP_PATH)
 from acestep.handler import AceStepHandler
 from acestep.llm_inference import LLMHandler
 from acestep.inference import GenerationParams, GenerationConfig, generate_music
+from acestep.model_downloader import download_submodel
 
 # Global handlers (initialized once)
 _handler = None
 _llm_handler = None
+_handler_model = None
+_llm_model = None
 
-def get_handlers():
-    global _handler, _llm_handler
-    if _handler is None:
+def get_handlers(dit_model: str = "acestep-v15-turbo", thinking: bool = False, lm_model: str = "acestep-5Hz-lm-1.7B", lm_backend: str = "pt"):
+    global _handler, _llm_handler, _handler_model, _llm_model
+    if _handler is None or _handler_model != dit_model:
         if torch.cuda.is_available():
             device = "cuda"
         elif torch.backends.mps.is_available():
@@ -37,11 +41,41 @@ def get_handlers():
         _handler = AceStepHandler()
         _handler.initialize_service(
             project_root=ACESTEP_PATH,
-            config_path="acestep-v15-turbo",
+            config_path=dit_model,
             device=device,
             offload_to_cpu=True,  # For 12GB GPU
         )
-        _llm_handler = LLMHandler()  # Create but don't initialize (not enough VRAM)
+        _handler_model = dit_model
+    if _llm_handler is None:
+        _llm_handler = LLMHandler()
+    if thinking and _llm_model != lm_model:
+        checkpoint_dir = os.path.join(ACESTEP_PATH, "checkpoints")
+        model_dir = os.path.join(checkpoint_dir, lm_model)
+        if not os.path.exists(model_dir) or not os.listdir(model_dir):
+            print(f"ACE-Step LM {lm_model} not found, downloading...", file=sys.stderr)
+            success, msg = download_submodel(lm_model, Path(checkpoint_dir))
+            if not success:
+                print(f"ACE-Step LM {lm_model} download failed: {msg}", file=sys.stderr)
+                return _handler, _llm_handler
+            print(f"ACE-Step LM {lm_model} downloaded: {msg}", file=sys.stderr)
+        if torch.cuda.is_available():
+            lm_device = "cuda"
+        elif torch.backends.mps.is_available():
+            lm_device = "mps"
+        else:
+            lm_device = "cpu"
+        status, success = _llm_handler.initialize(
+            checkpoint_dir=checkpoint_dir,
+            lm_model_path=lm_model,
+            backend=lm_backend,
+            device=lm_device,
+            offload_to_cpu=True,
+        )
+        if success:
+            _llm_model = lm_model
+            print(f"Initialized ACE-Step LM {lm_model}: {status}", file=sys.stderr)
+        else:
+            print(f"ACE-Step LM {lm_model} unavailable: {status}", file=sys.stderr)
     return _handler, _llm_handler
 
 def generate(
@@ -56,6 +90,7 @@ def generate(
     vocal_language: str = "auto",
 
     # Generation parameters
+    dit_model: str = "acestep-v15-turbo",
     infer_steps: int = 8,
     guidance_scale: float = 10.0,
     batch_size: int = 1,
@@ -75,6 +110,8 @@ def generate(
 
     # LM/CoT parameters
     thinking: bool = False,
+    lm_model: str = "acestep-5Hz-lm-1.7B",
+    lm_backend: str = "pt",
     lm_temperature: float = 0.85,
     lm_cfg_scale: float = 2.0,
     lm_top_k: int = 0,
@@ -93,7 +130,7 @@ def generate(
     output_dir: str = None,
 ):
     """Generate music and return audio file paths."""
-    handler, llm_handler = get_handlers()
+    handler, llm_handler = get_handlers(dit_model=dit_model, thinking=thinking, lm_model=lm_model, lm_backend=lm_backend)
 
     if output_dir is None:
         output_dir = os.path.join(ACESTEP_PATH, "output")
@@ -183,6 +220,7 @@ def main():
     parser.add_argument("--vocal-language", type=str, default="auto", help="Vocal language code")
 
     # Generation parameters
+    parser.add_argument("--dit-model", type=str, default="acestep-v15-turbo", help="ACE-Step DiT model config")
     parser.add_argument("--infer-steps", type=int, default=8, help="Inference steps")
     parser.add_argument("--guidance-scale", type=float, default=10.0, help="Guidance scale")
     parser.add_argument("--batch-size", type=int, default=1, help="Batch size")
@@ -204,6 +242,8 @@ def main():
 
     # LM/CoT parameters
     parser.add_argument("--thinking", action="store_true", help="Enable Chain-of-Thought reasoning")
+    parser.add_argument("--lm-model", type=str, default="acestep-5Hz-lm-1.7B", help="ACE-Step LM model")
+    parser.add_argument("--lm-backend", type=str, default="pt", help="ACE-Step LM backend")
     parser.add_argument("--lm-temperature", type=float, default=0.85, help="LLM temperature")
     parser.add_argument("--lm-cfg-scale", type=float, default=2.0, help="LLM guidance scale")
     parser.add_argument("--lm-top-k", type=int, default=0, help="LLM top-k sampling")
@@ -237,6 +277,7 @@ def main():
             vocal_language=args.vocal_language,
 
             # Generation
+            dit_model=args.dit_model,
             infer_steps=args.infer_steps,
             guidance_scale=args.guidance_scale,
             batch_size=args.batch_size,
@@ -256,6 +297,8 @@ def main():
 
             # LM/CoT
             thinking=args.thinking,
+            lm_model=args.lm_model,
+            lm_backend=args.lm_backend,
             lm_temperature=args.lm_temperature,
             lm_cfg_scale=args.lm_cfg_scale,
             lm_top_k=args.lm_top_k,

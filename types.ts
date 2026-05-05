@@ -69,6 +69,8 @@ export interface GenerationParams {
   style: string;
   title: string;
   ditModel?: string;
+  modelPreset?: 'fast' | 'quality' | 'advanced';
+  strictMode?: boolean;
 
   // Common
   instrumental: boolean;
@@ -129,6 +131,18 @@ export interface GenerationParams {
   trackName?: string;
   completeTrackClasses?: string[];
   isFormatCaption?: boolean;
+  lockedConstraints?: {
+    genres: string[];
+    language?: string;
+    vocalGender?: 'male' | 'female';
+    vocalTone: string[];
+    mood: string[];
+    bpm?: number;
+    duration?: number;
+    keyScale?: string;
+    timeSignature?: string;
+    instrumental: boolean;
+  };
 }
 
 export interface PlayerState {

@@ -763,6 +763,7 @@ async function processGenerationViaPython(
       '--infer-steps', String(params.inferenceSteps ?? 8),
       '--guidance-scale', String(params.guidanceScale ?? 10.0),
       '--audio-format', getFallbackAudioFormat(params),
+      '--dit-model', params.ditModel || 'acestep-v15-turbo',
       '--output-dir', jobOutputDir,
       '--json',
     ];
@@ -794,12 +795,13 @@ async function processGenerationViaPython(
     }
     if (params.instruction) args.push('--instruction', params.instruction);
     if (params.thinking) args.push('--thinking');
+    if (params.lmModel) args.push('--lm-model', params.lmModel);
+    if (params.lmBackend) args.push('--lm-backend', params.lmBackend);
     if (params.lmTemperature !== undefined) args.push('--lm-temperature', String(params.lmTemperature));
     if (params.lmCfgScale !== undefined) args.push('--lm-cfg-scale', String(params.lmCfgScale));
     if (params.lmTopK !== undefined && params.lmTopK > 0) args.push('--lm-top-k', String(params.lmTopK));
     if (params.lmTopP !== undefined) args.push('--lm-top-p', String(params.lmTopP));
     if (params.lmNegativePrompt) args.push('--lm-negative-prompt', params.lmNegativePrompt);
-    // Note: --lm-backend and --lm-model are not supported by simple_generate.py
     if (params.useCotMetas === false) args.push('--no-cot-metas');
     if (params.useCotCaption === false) args.push('--no-cot-caption');
     if (params.useCotLanguage === false) args.push('--no-cot-language');
