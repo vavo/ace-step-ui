@@ -65,6 +65,13 @@ const ACESTEP_DIR = resolveAceStepPath();
 const SCRIPTS_DIR = path.join(__dirname, '../../scripts');
 const PYTHON_SCRIPT = path.join(SCRIPTS_DIR, 'simple_generate.py');
 const DEFAULT_AUTO_DURATION_SECONDS = 120;
+const DEFAULT_GENERATION_TIMEOUT_MS = 45 * 60 * 1000;
+
+function resolveGenerationTimeoutMs(): number {
+  const raw = process.env.GENERATION_TIMEOUT_MS || process.env.ACESTEP_GENERATION_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed >= 600000 ? parsed : DEFAULT_GENERATION_TIMEOUT_MS;
+}
 
 function getFallbackAudioFormat(params: Pick<GenerationParams, 'audioFormat'>): 'wav' | 'flac' {
   if (params.audioFormat === 'flac') {
@@ -876,10 +883,12 @@ interface PythonResult {
   success: boolean;
   audio_paths?: string[];
   elapsed_seconds?: number;
+  estimated_bpm?: number;
+  quality_warnings?: string[];
   error?: string;
 }
 
-function runPythonGeneration(scriptArgs: string[], timeoutMs = 600000): Promise<PythonResult> {
+function runPythonGeneration(scriptArgs: string[], timeoutMs = resolveGenerationTimeoutMs()): Promise<PythonResult> {
   return new Promise((resolve) => {
     const pythonPath = resolvePythonPath(ACESTEP_DIR);
     const args = [PYTHON_SCRIPT, ...scriptArgs];
@@ -892,11 +901,11 @@ function runPythonGeneration(scriptArgs: string[], timeoutMs = 600000): Promise<
       },
     });
 
-    // Kill process after timeout (default 10 minutes)
+    // Kill process after timeout. First model load/download can be slow on fresh pods.
     const timer = setTimeout(() => {
       proc.kill('SIGTERM');
       setTimeout(() => { if (!proc.killed) proc.kill('SIGKILL'); }, 5000);
-      resolve({ success: false, error: `Generation timed out after ${timeoutMs / 1000}s` });
+      resolve({ success: false, error: `Generation timed out after ${Math.round(timeoutMs / 1000)}s` });
     }, timeoutMs);
 
     let stdout = '';

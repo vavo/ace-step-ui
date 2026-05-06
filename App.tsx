@@ -30,6 +30,8 @@ const TrainingPanel = lazy(() => import('./components/TrainingPanel').then((modu
 const UserProfile = lazy(() => import('./components/UserProfile').then((module) => ({ default: module.UserProfile })));
 const VideoGeneratorModal = lazy(() => import('./components/VideoGeneratorModal').then((module) => ({ default: module.VideoGeneratorModal })));
 
+const GENERATION_POLL_TIMEOUT_MS = 45 * 60 * 1000;
+
 function AppContent() {
   // i18n
   const { t, language, setLanguage } = useI18n();
@@ -39,7 +41,7 @@ function AppContent() {
   
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   // Track multiple concurrent generation jobs
-  const activeJobsRef = useRef<Map<string, { tempId: string; pollInterval: ReturnType<typeof setInterval> }>>(new Map());
+  const activeJobsRef = useRef<Map<string, { tempId: string; pollInterval: ReturnType<typeof setInterval>; params?: GenerationParams }>>(new Map());
   const [activeJobCount, setActiveJobCount] = useState(0);
 
   // Theme State
@@ -140,6 +142,7 @@ function AppContent() {
     type: 'success',
     isVisible: false,
   });
+  const [retryGenerationParams, setRetryGenerationParams] = useState<GenerationParams | null>(null);
 
   // Confirm Dialog State
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -824,7 +827,7 @@ function AppContent() {
     }
   }, [token]);
 
-  const beginPollingJob = useCallback((jobId: string, tempId: string) => {
+  const beginPollingJob = useCallback((jobId: string, tempId: string, params?: GenerationParams) => {
     if (!token) return;
     if (activeJobsRef.current.has(jobId)) return;
 
@@ -872,26 +875,32 @@ function AppContent() {
             setMobileShowList(true);
           }
         } else if (status.status === 'failed') {
+          const retryParams = activeJobsRef.current.get(jobId)?.params;
           cleanupJob(jobId, tempId);
           console.error(`Job ${jobId} failed:`, status.error);
+          if (retryParams) setRetryGenerationParams(retryParams);
           showToast(`${t('generationFailed')}: ${status.error || 'Unknown error'}`, 'error');
         }
       } catch (pollError) {
+        const retryParams = activeJobsRef.current.get(jobId)?.params;
         console.error(`Polling error for job ${jobId}:`, pollError);
         cleanupJob(jobId, tempId);
+        if (retryParams) setRetryGenerationParams(retryParams);
       }
     }, 2000);
 
-    activeJobsRef.current.set(jobId, { tempId, pollInterval });
+    activeJobsRef.current.set(jobId, { tempId, pollInterval, params });
     setActiveJobCount(activeJobsRef.current.size);
 
     setTimeout(() => {
       if (activeJobsRef.current.has(jobId)) {
+        const retryParams = activeJobsRef.current.get(jobId)?.params;
         console.warn(`Job ${jobId} timed out`);
         cleanupJob(jobId, tempId);
+        if (retryParams) setRetryGenerationParams(retryParams);
         showToast(t('generationTimedOut'), 'error');
       }
-    }, 600000);
+    }, GENERATION_POLL_TIMEOUT_MS);
   }, [token, cleanupJob, refreshSongsList]);
 
   const buildTempSongFromParams = (params: GenerationParams, tempId: string, createdAt?: string) => ({
@@ -914,6 +923,7 @@ function AppContent() {
       return;
     }
 
+    setRetryGenerationParams(null);
     setIsGenerating(true);
     setCurrentView('create');
     setMobileShowList(false);
@@ -998,7 +1008,7 @@ function AppContent() {
         isFormatCaption: params.isFormatCaption,
       }, token);
 
-      beginPollingJob(job.jobId, tempId);
+      beginPollingJob(job.jobId, tempId, params);
 
     } catch (e) {
       console.error('Generation error:', e);
@@ -1018,6 +1028,7 @@ function AppContent() {
         return;
       }
 
+      setRetryGenerationParams(params);
       showToast(t('generationFailed'), 'error');
     }
   };
@@ -1065,7 +1076,15 @@ function AppContent() {
           const jobId = job.id || job.jobId;
           if (!jobId) continue;
           const tempId = `job_${jobId}`;
-          beginPollingJob(jobId, tempId);
+          const params = (() => {
+            try {
+              if (!job.params) return undefined;
+              return typeof job.params === 'string' ? JSON.parse(job.params) : job.params;
+            } catch {
+              return undefined;
+            }
+          })();
+          beginPollingJob(jobId, tempId, params);
         }
       } catch (error) {
         console.error('Failed to resume jobs:', error);
@@ -1658,6 +1677,32 @@ function AppContent() {
         isVisible={toast.isVisible}
         onClose={closeToast}
       />
+      {retryGenerationParams && (
+        <div className="fixed bottom-24 left-1/2 z-[101] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-900 p-4 shadow-2xl">
+          <div className="text-sm font-semibold text-zinc-900 dark:text-white">{t('generationRetryAvailable')}</div>
+          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{t('generationRetryHint')}</div>
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setRetryGenerationParams(null)}
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            >
+              {t('dismiss')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const params = retryGenerationParams;
+                setRetryGenerationParams(null);
+                void handleGenerate(params);
+              }}
+              className="rounded-lg bg-pink-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-pink-500"
+            >
+              {t('queueAgain')}
+            </button>
+          </div>
+        </div>
+      )}
       {isVideoModalOpen && (
         <Suspense fallback={null}>
           <VideoGeneratorModal
