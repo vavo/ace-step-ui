@@ -2,7 +2,9 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Song } from '../types';
 import { X, Play, Pause, Download, Wand2, Image as ImageIcon, Music, Video, Loader2, Palette, Layers, Zap, Type, Monitor, Aperture, Activity, Circle, Grid, Box, BarChart2, Waves, Disc, Upload, Plus, Trash2, Settings2, MousePointer2, Search, ExternalLink, Sun, Film, Minus } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { fetchFile } from '@ffmpeg/util';
+import ffmpegCoreUrl from '@ffmpeg/core?url';
+import ffmpegWasmUrl from '@ffmpeg/core/wasm?url';
 import { useResponsive } from '../context/ResponsiveContext';
 import { useI18n } from '../context/I18nContext';
 
@@ -230,24 +232,10 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
         }
       });
 
-      const cdnBases = [
-        'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
-        'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',
-      ];
-      let loaded = false;
-      for (const baseURL of cdnBases) {
-        try {
-          await ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-          });
-          loaded = true;
-          break;
-        } catch {
-          console.warn(`FFmpeg load failed from ${baseURL}, trying next CDN...`);
-        }
-      }
-      if (!loaded) throw new Error('All CDN sources failed');
+      await ffmpeg.load({
+        coreURL: ffmpegCoreUrl,
+        wasmURL: ffmpegWasmUrl,
+      });
 
       ffmpegRef.current = ffmpeg;
       setFfmpegLoaded(true);
