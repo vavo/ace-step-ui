@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/copy-ffmpeg-core.cjs",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "cd server && npx tsx src/index.ts & npm run dev"
+    "start": "cd server && npx tsx src/index.ts & npm run dev",
+    "postinstall": "node scripts/copy-ffmpeg-core.cjs"
   },
   "dependencies": {
     "@ffmpeg/core": "0.12.6",
