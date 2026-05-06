@@ -61,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </svg>
           </div>
           {isOpen && (
-            <span className="text-lg font-bold text-zinc-900 dark:text-white whitespace-nowrap">ACE Step</span>
+            <span className="text-lg font-bold text-zinc-900 dark:text-white whitespace-nowrap">getMUSIC</span>
           )}
         </div>
         {/* Collapse/Expand Button */}

@@ -14,3 +14,4 @@
 bitsandbytes
 pyWavelets
 pytorch_wavelets
+librosa

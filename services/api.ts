@@ -464,6 +464,9 @@ export interface GenerationJob {
 }
 
 export const generateApi = {
+  health: (): Promise<{ healthy: boolean; aceStepUrl?: string; error?: string }> =>
+    api('/api/generate/health'),
+
   startGeneration: (params: GenerationParams, token: string): Promise<GenerationJob> =>
     api('/api/generate', { method: 'POST', body: params, token }),
 

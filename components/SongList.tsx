@@ -30,6 +30,7 @@ interface SongListProps {
     onCoverSong?: (song: Song) => void;
     onUseUploadAsReference?: (track: { audio_url: string; filename: string }) => void;
     onCoverUpload?: (track: { audio_url: string; filename: string }) => void;
+    onRenameUpload?: (trackId: string, filename: string) => Promise<void>;
 }
 
 // ... existing code ...
@@ -86,6 +87,13 @@ const createDragPreview = (element: HTMLElement) => {
     return clone;
 };
 
+const getSongProgress = (song: Song): number | null => {
+    if (!song.isGenerating || song.queuePosition) return null;
+    const value = Number(song.progress);
+    if (!Number.isFinite(value)) return null;
+    return Math.max(0, Math.min(100, value > 1 ? value : value * 100));
+};
+
 export const SongList: React.FC<SongListProps> = ({
     songs,
     currentSong,
@@ -107,7 +115,8 @@ export const SongList: React.FC<SongListProps> = ({
     onUseAsReference,
     onCoverSong,
     onUseUploadAsReference,
-    onCoverUpload
+    onCoverUpload,
+    onRenameUpload
 }) => {
     const { user } = useAuth();
     const { t } = useI18n();
@@ -222,7 +231,7 @@ export const SongList: React.FC<SongListProps> = ({
                 {/* Header */}
                 <div className="flex flex-col gap-6 mb-8">
                     <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        <span className="hover:text-black dark:hover:text-white cursor-pointer transition-colors">{t('workspaces')}</span>
+                        <span>{t('workspaces')}</span>
                         <span className="text-zinc-400 dark:text-zinc-600">›</span>
                         <span className="text-zinc-900 dark:text-white font-medium">{t('myWorkspace')}</span>
                     </div>
@@ -409,6 +418,7 @@ export const SongList: React.FC<SongListProps> = ({
                                     }}
                                     onUseAsReference={() => onUseUploadAsReference?.(item.track)}
                                     onCoverSong={() => onCoverUpload?.(item.track)}
+                                    onRename={onRenameUpload}
                                 />
                             )
                         ))
@@ -439,6 +449,7 @@ interface SongItemProps {
     onReusePrompt?: () => void;
     onDelete?: () => void;
     onSongUpdate?: (updatedSong: Song) => void;
+    onRename?: (title: string) => Promise<void>;
     onUseAsReference?: () => void;
     onCoverSong?: () => void;
 }
@@ -463,10 +474,11 @@ const SongItem: React.FC<SongItemProps> = ({
     onReusePrompt,
     onDelete,
     onSongUpdate,
+    onRename,
     onUseAsReference,
     onCoverSong
 }) => {
-    const { token } = useAuth();
+    const { token, user } = useAuth();
     const { t } = useI18n();
     const [showDropdown, setShowDropdown] = useState(false);
     const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -474,6 +486,8 @@ const SongItem: React.FC<SongItemProps> = ({
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editedTitle, setEditedTitle] = useState(song.title);
     const titleInputRef = useRef<HTMLInputElement>(null);
+    const creatorName = song.creator || (song.isGenerating ? user?.username : '') || t('unknown');
+    const progressPercent = getSongProgress(song);
 
     useEffect(() => {
         if (isEditingTitle && titleInputRef.current) {
@@ -482,15 +496,31 @@ const SongItem: React.FC<SongItemProps> = ({
         }
     }, [isEditingTitle]);
 
+    useEffect(() => {
+        if (!isEditingTitle) {
+            setEditedTitle(song.title);
+        }
+    }, [isEditingTitle, song.title]);
+
     const handleSaveTitle = async () => {
-        if (!token || !isOwner || !editedTitle.trim() || editedTitle === song.title) {
+        const nextTitle = editedTitle.trim();
+        if (!isOwner || !nextTitle || nextTitle === song.title) {
             setIsEditingTitle(false);
             setEditedTitle(song.title);
             return;
         }
 
         try {
-            const response = await songsApi.updateSong(song.id, { title: editedTitle.trim() }, token);
+            if (onRename) {
+                await onRename(nextTitle);
+                setEditedTitle(nextTitle);
+                setIsEditingTitle(false);
+                return;
+            }
+            if (!token) {
+                throw new Error('Missing auth token');
+            }
+            const response = await songsApi.updateSong(song.id, { title: nextTitle }, token);
             setIsEditingTitle(false);
             // Update the parent component's song list
             if (onSongUpdate && response.song) {
@@ -636,7 +666,7 @@ const SongItem: React.FC<SongItemProps> = ({
                                     }
                                 }}
                             >
-                                {song.title || (song.isGenerating ? (song.queuePosition ? "Queued..." : "Creating...") : "Untitled")}
+                                {song.title || (song.isGenerating ? (song.queuePosition ? t('queued') : t('generating')) : t('untitled'))}
                             </h3>
                         )}
                         <span className="inline-flex items-center justify-center text-[9px] font-bold text-white bg-gradient-to-r from-pink-500 to-purple-500 px-1.5 py-0.5 rounded-sm shadow-sm" title={`DiT model: ${song.ditModel || 'undefined'}`}>
@@ -651,16 +681,16 @@ const SongItem: React.FC<SongItemProps> = ({
                             className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (song.creator && onNavigateToProfile) {
-                                    onNavigateToProfile(song.creator);
+                                if (creatorName && creatorName !== t('unknown') && onNavigateToProfile) {
+                                    onNavigateToProfile(creatorName);
                                 }
                             }}
                         >
                             <div className="w-4 h-4 rounded-full bg-purple-500 text-[8px] flex items-center justify-center font-bold text-white">
-                                {(song.creator?.[0] || 'U').toUpperCase()}
+                                {(creatorName[0] || 'U').toUpperCase()}
                             </div>
                             <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors hover:underline">
-                                {song.creator || 'Unknown'}
+                                {creatorName}
                             </span>
                         </div>
                     </div>
@@ -669,14 +699,11 @@ const SongItem: React.FC<SongItemProps> = ({
                     </p>
                     {song.isGenerating && (
                         <div className="pt-2">
-                            <div className="h-1 rounded-full bg-zinc-200/70 dark:bg-white/10 overflow-hidden">
+                            <div className="h-1 rounded-full bg-zinc-300 dark:bg-white/10 overflow-hidden">
                                 <div
-                                    className={`h-full bg-gradient-to-r from-pink-500 to-purple-600 transition-all ${song.progress === undefined ? 'opacity-40' : ''}`}
+                                    className={`h-full rounded-full bg-emerald-500 transition-all duration-700 ease-out ${progressPercent === null ? 'w-1/3 animate-pulse opacity-80' : ''}`}
                                     style={{
-                                        width: `${Math.min(
-                                            100,
-                                            Math.max(0, ((song.progress ?? 0) > 1 ? (song.progress ?? 0) / 100 : (song.progress ?? 0)) * 100)
-                                        )}%`,
+                                        width: progressPercent === null ? undefined : `${progressPercent}%`,
                                     }}
                                 />
                             </div>
@@ -769,7 +796,7 @@ const SongItem: React.FC<SongItemProps> = ({
             <div className="text-xs font-mono text-zinc-500 dark:text-zinc-600 self-start pt-1">
                 {song.isGenerating ? (
                     <span className={song.queuePosition ? 'text-amber-500' : 'text-pink-500'}>
-                        {song.queuePosition ? `#${song.queuePosition}` : 'Creating...'}
+                        {song.queuePosition ? `#${song.queuePosition}` : t('generating')}
                     </span>
                 ) : song.duration}
             </div>
@@ -789,8 +816,10 @@ const UploadItem: React.FC<{
     onPlay: (audioUrl: string, title: string) => void;
     onUseAsReference?: () => void;
     onCoverSong?: () => void;
-}> = ({ track, onPlay, onUseAsReference, onCoverSong }) => {
+    onRename?: (trackId: string, filename: string) => Promise<void>;
+}> = ({ track, onPlay, onUseAsReference, onCoverSong, onRename }) => {
     const title = track.filename.replace(/\.[^/.]+$/, '');
+    const extension = track.filename.match(/\.[^/.]+$/)?.[0] || '';
     const playableUrl = getAudioUrl(track.audio_url) || track.audio_url;
     const duration = track.duration
         ? `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, '0')}`
@@ -815,7 +844,7 @@ const UploadItem: React.FC<{
             isChecked={false}
             isLiked={false}
             isPlaying={false}
-            isOwner={false}
+            isOwner={Boolean(onRename)}
             onPlay={() => onPlay(playableUrl, title)}
             onSelect={() => onPlay(playableUrl, title)}
             onToggleSelect={() => undefined}
@@ -826,6 +855,14 @@ const UploadItem: React.FC<{
             onNavigateToProfile={() => undefined}
             onReusePrompt={undefined}
             onDelete={() => undefined}
+            onRename={onRename ? async (nextTitle) => {
+                const trimmed = nextTitle.trim();
+                if (!trimmed) return;
+                const nextFilename = extension && !trimmed.toLowerCase().endsWith(extension.toLowerCase())
+                    ? `${trimmed}${extension}`
+                    : trimmed;
+                await onRename(track.id, nextFilename);
+            } : undefined}
             onUseAsReference={onUseAsReference}
             onCoverSong={onCoverSong}
         />

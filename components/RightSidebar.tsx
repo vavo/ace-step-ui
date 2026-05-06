@@ -125,6 +125,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
         </div>
     );
 
+    const creatorName = song.creator || (song.isGenerating ? user?.username : '') || t('anonymous');
+    const canOpenCreator = creatorName !== t('anonymous');
+
     return (
         <div className="w-full h-full bg-zinc-50 dark:bg-suno-panel flex flex-col border-l border-zinc-200 dark:border-white/5 relative transition-colors duration-300">
 
@@ -273,14 +276,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
 
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-sm ring-2 ring-white dark:ring-black">
-                                {song.creator ? song.creator[0].toUpperCase() : 'A'}
+                                {(creatorName[0] || 'A').toUpperCase()}
                             </div>
                             <div className="flex flex-col">
                                 <span
-                                    onClick={() => song.creator && onNavigateToProfile?.(song.creator)}
+                                    onClick={() => canOpenCreator && onNavigateToProfile?.(creatorName)}
                                     className="text-sm font-semibold text-zinc-900 dark:text-white hover:underline cursor-pointer"
                                 >
-                                    {song.creator || t('anonymous')}
+                                    {creatorName}
                                 </span>
                                 <p className="text-xs text-zinc-500">{t('created')} {new Date(song.createdAt).toLocaleDateString()}</p>
                             </div>

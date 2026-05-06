@@ -238,7 +238,7 @@ router.post('/', authMiddleware, upload.single('audio'), async (req: Authenticat
   }
 });
 
-// Update reference track (duration, tags)
+// Update reference track (filename, duration, tags)
 router.patch('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Verify ownership
@@ -255,11 +255,25 @@ router.patch('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Resp
       return;
     }
 
-    const { duration, tags } = req.body;
+    const { filename, duration, tags } = req.body;
     const updates: string[] = [];
     const values: unknown[] = [];
     let paramCount = 1;
 
+    if (filename !== undefined) {
+      if (typeof filename !== 'string') {
+        res.status(400).json({ error: 'Filename must be a string' });
+        return;
+      }
+      const cleanFilename = filename.trim();
+      if (!cleanFilename || cleanFilename.length > 180 || /[/\\\0]/.test(cleanFilename)) {
+        res.status(400).json({ error: 'Invalid filename' });
+        return;
+      }
+      updates.push(`filename = $${paramCount}`);
+      values.push(cleanFilename);
+      paramCount++;
+    }
     if (duration !== undefined) {
       updates.push(`duration = $${paramCount}`);
       values.push(duration);

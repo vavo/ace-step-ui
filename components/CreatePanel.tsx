@@ -287,6 +287,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   // Available models fetched from backend
   const [fetchedModels, setFetchedModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
   const [lmAvailability, setLmAvailability] = useState<{ available: boolean; models: string[] }>({ available: false, models: [] });
+  const [generatorAvailable, setGeneratorAvailable] = useState(false);
 
   // Fallback model list when backend is unavailable
   const availableModels = useMemo(() => {
@@ -753,6 +754,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   useEffect(() => {
     const loadModelsAndLimits = async () => {
       await refreshModels();
+
+      try {
+        const health = await generateApi.health();
+        setGeneratorAvailable(Boolean(health.healthy));
+      } catch {
+        setGeneratorAvailable(false);
+      }
 
       // Fetch limits
       try {
@@ -1383,8 +1391,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         {/* Header - Mode Toggle & Model Selection */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">ACE-Step v1.5</span>
+            {generatorAvailable && (
+              <div
+                className="w-2 h-2 rounded-full bg-green-500 animate-pulse"
+                title={t('generatorAvailable')}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-2">

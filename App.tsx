@@ -512,6 +512,44 @@ function AppContent() {
     }
   }, [loadReferenceTracks, showToast, t, token]);
 
+  const handleRenameReferenceTrack = useCallback(async (trackId: string, filename: string) => {
+    if (!token) {
+      showToast(t('failedToRenameUpload'), 'error');
+      return;
+    }
+
+    const response = await fetch(`/api/reference-tracks/${trackId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filename }),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(errorBody.error || t('failedToRenameUpload'));
+    }
+
+    const data = await response.json();
+    if (!data.track) {
+      await loadReferenceTracks();
+      return;
+    }
+
+    const updatedTrack = data.track as ReferenceTrack;
+    const uploadSongId = `upload_${updatedTrack.id}`;
+    const updatedTitle = updatedTrack.filename.replace(/\.[^/.]+$/, '');
+
+    setReferenceTracks(prev => prev.map(track => track.id === updatedTrack.id ? updatedTrack : track));
+    setCurrentSong(prev => prev?.id === uploadSongId ? { ...prev, title: updatedTitle } : prev);
+    setSelectedSong(prev => prev?.id === uploadSongId ? { ...prev, title: updatedTitle } : prev);
+    setPlayQueue(prev => prev.map(song => song.id === uploadSongId ? { ...song, title: updatedTitle } : song));
+    showToast(t('uploadRenamed'));
+  }, [loadReferenceTracks, showToast, t, token]);
+
   // Player Logic
   const getActiveQueue = (song?: Song) => {
     if (playQueue.length > 0) return playQueue;
@@ -751,7 +789,7 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentSong, songs]);
 
-  // Helper to cleanup a job and check if all jobs are done
+  // Helper to cleanup a queued/running job without blocking the prompt form.
   const cleanupJob = useCallback((jobId: string, tempId: string) => {
     const jobData = activeJobsRef.current.get(jobId);
     if (jobData) {
@@ -764,11 +802,6 @@ function AppContent() {
 
     // Update active job count
     setActiveJobCount(activeJobsRef.current.size);
-
-    // If no more active jobs, set isGenerating to false
-    if (activeJobsRef.current.size === 0) {
-      setIsGenerating(false);
-    }
   }, []);
 
   // Refresh songs list (called when any job completes successfully)
@@ -914,6 +947,9 @@ function AppContent() {
     isGenerating: true,
     tags: params.customMode ? ['custom'] : ['simple'],
     isPublic: true,
+    userId: user?.id,
+    creator: user?.username,
+    creator_avatar: user?.avatar_url,
   });
 
   // Handlers
@@ -940,7 +976,10 @@ function AppContent() {
       createdAt: new Date(),
       isGenerating: true,
       tags: params.customMode ? ['custom'] : ['simple'],
-      isPublic: true
+      isPublic: true,
+      userId: user?.id,
+      creator: user?.username,
+      creator_avatar: user?.avatar_url,
     };
 
     setSongs(prev => [tempSong, ...prev]);
@@ -1017,11 +1056,6 @@ function AppContent() {
         setSelectedSong(null);
       }
 
-      // Only set isGenerating to false if no other jobs are running
-      if (activeJobsRef.current.size === 0) {
-        setIsGenerating(false);
-      }
-
       const message = e instanceof Error ? e.message : '';
       if (message.startsWith('402:') || /insufficient credits/i.test(message)) {
         setShowInsufficientCreditsModal(true);
@@ -1030,6 +1064,8 @@ function AppContent() {
 
       setRetryGenerationParams(params);
       showToast(t('generationFailed'), 'error');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -1409,6 +1445,7 @@ function AppContent() {
             onReusePrompt={handleReuse}
             onDeleteSong={handleDeleteSong}
             onDeleteReferenceTrack={handleDeleteReferenceTrack}
+            onRenameReferenceTrack={handleRenameReferenceTrack}
             onUploadReferenceTrack={handleUploadReferenceTrack}
             isUploadingReferenceTrack={isUploadingReferenceTrack}
           />
@@ -1557,6 +1594,7 @@ function AppContent() {
                 onCoverSong={handleCoverSong}
                 onUseUploadAsReference={handleUseUploadAsReference}
                 onCoverUpload={handleCoverUpload}
+                onRenameUpload={handleRenameReferenceTrack}
                 onSongUpdate={handleSongUpdate}
               />
             </div>

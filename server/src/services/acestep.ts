@@ -458,6 +458,20 @@ interface ActiveJob {
 
 const activeJobs = new Map<string, ActiveJob>();
 
+function estimateRunningProgress(job: ActiveJob, elapsedSeconds: number): number {
+  if (typeof job.progress === 'number' && Number.isFinite(job.progress)) {
+    return Math.max(0, Math.min(0.98, job.progress > 1 ? job.progress / 100 : job.progress));
+  }
+
+  const requestedDuration = Number(job.params.duration);
+  const durationSeconds = Number.isFinite(requestedDuration) && requestedDuration > 0 ? requestedDuration : 180;
+  const requestedBatchSize = Number(job.params.batchSize);
+  const batchSize = Number.isFinite(requestedBatchSize) && requestedBatchSize > 0 ? requestedBatchSize : 1;
+  const estimatedTotalSeconds = Math.max(75, Math.min(900, 45 + durationSeconds * 0.35 * batchSize));
+
+  return Math.max(0.04, Math.min(0.95, elapsedSeconds / estimatedTotalSeconds));
+}
+
 // Periodic cleanup of old jobs (every 10 minutes, remove jobs older than 1 hour)
 setInterval(() => cleanupOldJobs(3600000), 600000);
 
@@ -997,7 +1011,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
   return {
     status: job.status,
     etaSeconds: Math.max(0, 180 - elapsed),
-    progress: job.progress,
+    progress: estimateRunningProgress(job, elapsed),
     stage: job.stage,
   };
 }

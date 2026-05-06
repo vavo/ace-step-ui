@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Song, Playlist } from '../types';
-import { Heart, Plus, Music, Play, MoreHorizontal, Trash2, Upload, Loader2 } from 'lucide-react';
+import { Heart, Plus, Music, Play, MoreHorizontal, Trash2, Upload, Loader2, Edit3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
@@ -22,6 +22,7 @@ interface LibraryViewProps {
   onReusePrompt?: (song: Song) => void;
   onDeleteSong?: (song: Song) => void;
   onDeleteReferenceTrack?: (trackId: string) => void;
+  onRenameReferenceTrack?: (trackId: string, filename: string) => Promise<void>;
   onUploadReferenceTrack?: (file: File) => Promise<void>;
   isUploadingReferenceTrack?: boolean;
 }
@@ -57,6 +58,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     onReusePrompt,
     onDeleteSong,
     onDeleteReferenceTrack,
+    onRenameReferenceTrack,
     onUploadReferenceTrack,
     isUploadingReferenceTrack = false,
 }) => {
@@ -65,6 +67,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const [activeTab, setActiveTab] = useState<'all' | 'playlists' | 'liked' | 'uploads'>('all');
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [shareSong, setShareSong] = useState<Song | null>(null);
+    const [editingUploadId, setEditingUploadId] = useState<string | null>(null);
+    const [editingUploadName, setEditingUploadName] = useState('');
+    const [savingUploadId, setSavingUploadId] = useState<string | null>(null);
     const uploadInputRef = useRef<HTMLInputElement | null>(null);
     const fallbackUsedBytes = referenceTracks.reduce((total, track) => total + (track.file_size_bytes || 0), 0);
     const usedBytes = referenceUploadUsage?.usedBytes ?? fallbackUsedBytes;
@@ -98,6 +103,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         event.currentTarget.value = '';
         if (file) {
             void onUploadReferenceTrack?.(file);
+        }
+    };
+
+    const startRenameUpload = (track: ReferenceTrack) => {
+        setEditingUploadId(track.id);
+        setEditingUploadName(track.filename);
+    };
+
+    const cancelRenameUpload = () => {
+        setEditingUploadId(null);
+        setEditingUploadName('');
+    };
+
+    const saveRenameUpload = async (track: ReferenceTrack) => {
+        const nextName = editingUploadName.trim();
+        if (!nextName || nextName === track.filename) {
+            cancelRenameUpload();
+            return;
+        }
+        setSavingUploadId(track.id);
+        try {
+            await onRenameReferenceTrack?.(track.id, nextName);
+            cancelRenameUpload();
+        } finally {
+            setSavingUploadId(null);
         }
     };
 
@@ -365,11 +395,41 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                     <Music size={18} className="text-zinc-500 dark:text-zinc-400" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">{track.filename}</div>
+                                    {editingUploadId === track.id ? (
+                                        <input
+                                            value={editingUploadName}
+                                            onChange={(e) => setEditingUploadName(e.target.value)}
+                                            onBlur={() => void saveRenameUpload(track)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') void saveRenameUpload(track);
+                                                if (e.key === 'Escape') cancelRenameUpload();
+                                            }}
+                                            disabled={savingUploadId === track.id}
+                                            className="w-full rounded-md border border-pink-500 bg-zinc-100 px-2 py-1 text-sm font-medium text-zinc-900 outline-none dark:bg-zinc-800 dark:text-white"
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <div
+                                            className={`text-sm font-medium text-zinc-900 dark:text-white truncate ${onRenameReferenceTrack ? 'cursor-pointer hover:underline' : ''}`}
+                                            onClick={() => onRenameReferenceTrack && startRenameUpload(track)}
+                                            title={onRenameReferenceTrack ? t('renameUpload') : undefined}
+                                        >
+                                            {track.filename}
+                                        </div>
+                                    )}
                                     <div className="text-xs text-zinc-500 dark:text-zinc-400">
                                         {formatBytes(track.file_size_bytes)} • {new Date(track.created_at).toLocaleDateString()}
                                     </div>
                                 </div>
+                                {onRenameReferenceTrack && editingUploadId !== track.id && (
+                                    <button
+                                        className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                                        onClick={() => startRenameUpload(track)}
+                                        title={t('renameUpload')}
+                                    >
+                                        <Edit3 size={16} />
+                                    </button>
+                                )}
                                 <button
                                     className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-500 hover:text-red-600 transition-colors"
                                     onClick={() => onDeleteReferenceTrack?.(track.id)}
