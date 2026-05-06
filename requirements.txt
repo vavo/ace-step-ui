@@ -1,4 +1,4 @@
-# ACE-Step UI Python helper scripts
+# GetMUSIC Python helper scripts
 #
 # The Python scripts under server/scripts are intended to run with the
 # ACE-Step-1.5 Python environment, not a separate app-specific virtualenv.

@@ -29,7 +29,17 @@ import {
 } from '../services/credits.js';
 import { recordPublishedSong } from '../services/gamification.js';
 import { transcodeToMp3 } from '../services/audioTranscode.js';
-import { buildStyleProfilePrompt, findStyleProfile } from '../data/styleProfiles.js';
+import { findStyleProfile } from '../data/styleProfiles.js';
+import {
+  buildLockedConstraints,
+  extractPromptConstraints,
+  hasExplicitGenerationIntent,
+  inferCaptionOutputLanguage,
+  preserveExplicitFormatIntent,
+  type CaptionOutputLanguage,
+  type LockedGenerationConstraints,
+  type PromptConstraints,
+} from '../services/promptConstraints.js';
 
 const router = Router();
 
@@ -94,26 +104,45 @@ function isIncompleteAceStepModelError(message: string): boolean {
   return /No \.safetensors files found|no file named .*model\.safetensors|failed to download|Disk quota exceeded/i.test(message);
 }
 
-const RANDOM_DESCRIPTION_FALLBACKS = [
-  'A mellow lo-fi chill track with soft piano chords and warm ambient pads.',
-  'An energetic 80s-inspired synthwave song with nostalgic arpeggios and punchy drums.',
-  'A cinematic emotional build-up with epic strings, deep bass, and delayed piano melody.',
-  'A relaxed lo-fi hip hop beat with vinyl crackle, mellow bassline, and jazzy keys.',
-  'A dynamic club-ready house track with bright leads and a steady four-on-the-floor groove.',
-  'A dreamy ambient pop song with airy vocals, reverb-heavy guitar, and sparse percussion.',
-];
+type RandomDescriptionLocale = 'en' | 'sk';
 
-function getRandomDescriptionFallback(): Omit<RandomDescriptionResult, 'fallback' | 'error'> {
-  const idx = Math.floor(Math.random() * RANDOM_DESCRIPTION_FALLBACKS.length);
+const RANDOM_DESCRIPTION_FALLBACKS: Record<RandomDescriptionLocale, string[]> = {
+  en: [
+    'A mellow lo-fi chill track with soft piano chords and warm ambient pads.',
+    'An energetic 80s-inspired synthwave song with nostalgic arpeggios and punchy drums.',
+    'A cinematic emotional build-up with epic strings, deep bass, and delayed piano melody.',
+    'A relaxed lo-fi hip hop beat with vinyl crackle, mellow bassline, and jazzy keys.',
+    'A dynamic club-ready house track with bright leads and a steady four-on-the-floor groove.',
+    'A dreamy ambient pop song with airy vocals, reverb-heavy guitar, and sparse percussion.',
+  ],
+  sk: [
+    'Pokojná lo-fi chill skladba s jemnými klavírnymi akordmi a teplými ambientnými plochami.',
+    'Energická synthwave skladba inšpirovaná 80. rokmi s nostalgickými arpeggiami a údernými bicími.',
+    'Filmová emotívna gradácia s epickými sláčikmi, hlbokým basom a oneskorenou klavírnou melódiou.',
+    'Uvoľnený lo-fi hiphopový beat s vinylovým praskaním, mäkkou basovou linkou a jazzovými klávesmi.',
+    'Dynamický klubový house track so žiarivými leadmi a stabilným four-on-the-floor groovom.',
+    'Snová ambient-popová skladba so vzdušnými vokálmi, gitarou v hlbokom reverbe a striedmou perkusiou.',
+  ],
+};
+
+function normalizeRandomDescriptionLocale(value?: string | string[] | null): RandomDescriptionLocale {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw?.toLowerCase().startsWith('sk') ? 'sk' : 'en';
+}
+
+function getRandomDescriptionFallback(locale?: string | string[] | null): Omit<RandomDescriptionResult, 'fallback' | 'error'> {
+  const normalizedLocale = normalizeRandomDescriptionLocale(locale);
+  const descriptions = RANDOM_DESCRIPTION_FALLBACKS[normalizedLocale];
+  const idx = Math.floor(Math.random() * descriptions.length);
   return {
-    description: RANDOM_DESCRIPTION_FALLBACKS[idx],
+    description: descriptions[idx],
     instrumental: false,
-    vocalLanguage: 'en',
+    vocalLanguage: normalizedLocale,
   };
 }
 
-async function resolveGradioRandomDescription(): Promise<RandomDescriptionResult> {
-  const fallback = getRandomDescriptionFallback();
+async function resolveGradioRandomDescription(locale?: string | string[] | null): Promise<RandomDescriptionResult> {
+  const fallback = getRandomDescriptionFallback(locale);
   const errorPrefix = 'Random description unavailable. Falling back to built-in suggestions.';
 
   let client: Awaited<ReturnType<typeof getGradioClient>>;
@@ -148,7 +177,7 @@ async function resolveGradioRandomDescription(): Promise<RandomDescriptionResult
       }
 
       return {
-        description: (data[0] as string) || getRandomDescriptionFallback().description,
+        description: (data[0] as string) || getRandomDescriptionFallback(locale).description,
         instrumental: Boolean(data[1]),
         vocalLanguage: (data[2] as string) || 'unknown',
         fallback: false,
@@ -209,8 +238,6 @@ function parseGeminiJson(text: string): GeminiFormatResult | null {
   }
 }
 
-type CaptionOutputLanguage = 'en' | 'sk' | 'cs';
-
 function captionLanguageLabel(language: CaptionOutputLanguage): string {
   switch (language) {
     case 'sk':
@@ -255,17 +282,6 @@ Top-p: ${input.topP || 'N/A'}
 `.trim();
 }
 
-function normalizeIntentText(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-}
-
-function includesAny(text: string, patterns: RegExp[]): boolean {
-  return patterns.some(pattern => pattern.test(text));
-}
-
 const FORMAT_SYSTEM_PROMPT = `
 You are a strict music prompt formatter for an AI music generator.
 Your job is to improve the user's prompt, not reinterpret it.
@@ -283,351 +299,6 @@ Rules:
 - If a parameter is not specified, you may infer a reasonable value, but do not override specified values.
 - Return only valid JSON matching the requested schema.
 `.trim();
-
-type IntentRule = {
-  label: string;
-  phrase: string;
-  patterns: RegExp[];
-  conflicts?: RegExp[];
-};
-
-type LanguageIntent = {
-  code: string;
-  label: string;
-  patterns: RegExp[];
-};
-
-type ExtractedFormatIntent = {
-  source: string;
-  genres: IntentRule[];
-  language?: LanguageIntent;
-  vocalGender?: 'male' | 'female';
-  vocalToneRules: IntentRule[];
-  moodRules: IntentRule[];
-  bpm?: number;
-  duration?: number;
-  keyScale?: string;
-  timeSignature?: string;
-  mustBeVocal: boolean;
-  instrumental: boolean;
-};
-
-const GENRE_RULES: IntentRule[] = [
-  {
-    label: 'hard techno',
-    phrase: 'hard techno track with relentless industrial kick drums, distorted rumble bass, tense rave stabs, and high-pressure warehouse energy',
-    patterns: [/hard\s+techno/, /tvrde\s+techno/, /tvrd[yae]\s+techno/],
-    conflicts: [/\bslow\b/, /pomal/, /\bchiptune\b/, /\b8-bit\b/, /8bit/, /video\s*game/, /\bmeme\b/, /\bklezmer\b/, /\bbalkan\b/, /\baccordion\b/],
-  },
-  {
-    label: 'jungle / drum and bass',
-    phrase: 'jungle / drum and bass song with fast breakbeats, rolling sub-bass, syncopated percussion, and atmospheric pads',
-    patterns: [/\bjungle\b/, /\bdnb\b/, /drum\s*(and|&)\s*bass/],
-    conflicts: [/\bchiptune\b/, /\b8-bit\b/, /8bit/, /video\s*game/, /\bmeme\b/, /computer\s+error/, /text-to-speech/, /\btrap\b/, /\bklezmer\b/, /\bbalkan\b/, /\baccordion\b/],
-  },
-  {
-    label: 'rock',
-    phrase: 'rock song with guitar-driven arrangement, punchy live drums, bass guitar, and a strong chorus hook',
-    patterns: [/\brock\b/, /rockov/, /rock song/],
-    conflicts: [/\bchiptune\b/, /\b8-bit\b/, /8bit/, /\btrap\b/, /\bklezmer\b/, /\bbalkan\b/, /\baccordion\b/, /video\s*game/, /\bmeme\b/],
-  },
-  {
-    label: 'pop',
-    phrase: 'pop song with polished production, memorable melodic hooks, and a clear chorus',
-    patterns: [/\bpop\b/, /popov/],
-  },
-  {
-    label: 'hip hop',
-    phrase: 'hip hop track with a tight beat, deep low end, rhythmic vocal flow, and modern production',
-    patterns: [/\bhip\s*hop\b/, /\bhip-hop\b/, /\brap\b/, /\brapov/],
-  },
-  {
-    label: 'trap',
-    phrase: 'trap track with sharp hi-hats, heavy 808 bass, sparse drums, and moody modern production',
-    patterns: [/\btrap\b/, /trapov/],
-  },
-  {
-    label: 'house',
-    phrase: 'house track with a four-on-the-floor groove, warm bassline, and club-ready energy',
-    patterns: [/\bhouse\b/, /housov/],
-  },
-  {
-    label: 'techno',
-    phrase: 'techno track with a driving kick, hypnotic synths, and warehouse energy',
-    patterns: [/\btechno\b/, /technov/],
-  },
-  {
-    label: 'metal',
-    phrase: 'metal song with heavy distorted guitars, aggressive drums, and intense vocal delivery',
-    patterns: [/\bmetal\b/, /metalov/],
-  },
-  {
-    label: 'punk',
-    phrase: 'punk song with raw guitars, fast drums, direct vocals, and rebellious energy',
-    patterns: [/\bpunk\b/, /punkov/],
-  },
-  {
-    label: 'folk',
-    phrase: 'folk song with organic acoustic instrumentation, intimate storytelling, and natural dynamics',
-    patterns: [/\bfolk\b/, /folkov/],
-  },
-  {
-    label: 'chiptune',
-    phrase: 'chiptune track with 8-bit synth textures, retro video game energy, and playful melodic hooks',
-    patterns: [/\bchiptune\b/, /\b8-bit\b/, /8bit/, /video\s*game/],
-  },
-];
-
-const LANGUAGE_RULES: LanguageIntent[] = [
-  { code: 'sk', label: 'Slovak', patterns: [/slovak/, /slovenc/, /slovencin/, /slovencine/, /slovensky/] },
-  { code: 'cs', label: 'Czech', patterns: [/czech/, /cesk/, /cestin/, /cestine/, /cesky/] },
-  { code: 'en', label: 'English', patterns: [/english/, /anglick/, /anglictin/] },
-  { code: 'de', label: 'German', patterns: [/german/, /deutsch/, /nemeck/] },
-  { code: 'fr', label: 'French', patterns: [/french/, /francuz/, /francais/] },
-  { code: 'es', label: 'Spanish', patterns: [/spanish/, /spaniel/, /espanol/] },
-  { code: 'pl', label: 'Polish', patterns: [/polish/, /polsk/] },
-  { code: 'uk', label: 'Ukrainian', patterns: [/ukrain/, /ukrajinsk/] },
-];
-
-const VOCAL_TONE_RULES: IntentRule[] = [
-  { label: 'raspy / hoarse', phrase: 'raspy, hoarse vocal tone', patterns: [/raspy/, /hoarse/, /husk/, /zachrip/, /chraplav/, /chraplavy/] },
-  { label: 'soft', phrase: 'soft intimate vocal tone', patterns: [/soft/, /jemn/, /nezny/, /nezna/] },
-  { label: 'powerful', phrase: 'powerful expressive vocal tone', patterns: [/powerful/, /strong vocal/, /siln/, /vyrazn/, /skvel/] },
-  { label: 'emotional', phrase: 'emotional vocal delivery', patterns: [/emotional/, /emocn/, /citliv/, /smutn/] },
-];
-
-const MOOD_RULES: IntentRule[] = [
-  { label: 'sad', phrase: 'sad emotional mood', patterns: [/sad/, /smutn/, /melanchol/] },
-  { label: 'dark', phrase: 'dark tense mood', patterns: [/dark/, /temn/, /ponur/] },
-  { label: 'happy', phrase: 'happy uplifting mood', patterns: [/happy/, /vesel/, /stastn/, /radost/] },
-  { label: 'energetic', phrase: 'energetic high-impact mood', patterns: [/energetic/, /energick/, /vysoka energia/, /high energy/] },
-  { label: 'romantic', phrase: 'romantic intimate mood', patterns: [/romantic/, /romantick/, /laska/, /love song/] },
-  { label: 'angry', phrase: 'angry aggressive mood', patterns: [/angry/, /nahnevan/, /agresiv/, /zlost/] },
-];
-
-function matchingRules(text: string, rules: IntentRule[]): IntentRule[] {
-  return rules.filter(rule => includesAny(text, rule.patterns));
-}
-
-function matchingLanguage(text: string): LanguageIntent | undefined {
-  return LANGUAGE_RULES.find(rule => includesAny(text, rule.patterns));
-}
-
-function inferCaptionOutputLanguage(input: GeminiFormatInput): CaptionOutputLanguage {
-  const rawSource = `${input.caption}\n${input.lyrics || ''}`;
-  const source = normalizeIntentText(rawSource);
-  const explicitLanguage = matchingLanguage(source);
-  if (explicitLanguage?.code === 'sk' || explicitLanguage?.code === 'cs') return explicitLanguage.code;
-
-  const hasSlovakDiacritics = /[áäčďéíĺľňóôŕšťúýž]/i.test(rawSource);
-  const hasSlovakWords = includesAny(source, [
-    /\b(chcem|spravit|urobit|pesnicku|piesen|skladbu|slovensk\w*|zensky\w*|zenskym|muzsky\w*|muzskym|hlasom|vokalom|textom|refr[eé]n|sloha|laska|zivot)\b/,
-  ]);
-
-  if (hasSlovakDiacritics || hasSlovakWords) return 'sk';
-  return 'en';
-}
-
-function parseBpm(text: string, explicitBpm?: number): number | undefined {
-  if (Number.isFinite(explicitBpm) && explicitBpm && explicitBpm > 0) return Math.round(explicitBpm);
-  const match = text.match(/\b([6-9]\d|1\d{2}|2[0-4]\d|250)\s*bpm\b/);
-  return match ? Number(match[1]) : undefined;
-}
-
-function extractFormatIntent(input: GeminiFormatInput): ExtractedFormatIntent {
-  const source = normalizeIntentText(`${input.caption}\n${input.lyrics || ''}`);
-  const language = matchingLanguage(source);
-  const vocalToneRules = matchingRules(source, VOCAL_TONE_RULES);
-  const vocalGender = includesAny(source, [/female\s+vocal/, /female\s+voice/, /woman\s+vocal/, /women\s+vocal/, /zensky/, /zenskym/, /zena/, /dievca/, /girl/])
-    ? 'female'
-    : includesAny(source, [/male\s+vocal/, /male\s+voice/, /man\s+vocal/, /muzsk/, /muzsky/, /chlap/, /chlapsk/, /boy/])
-      ? 'male'
-      : undefined;
-  const instrumental = includesAny(source, [/\binstrumental\b/, /bez\s+vokal/, /bez\s+spevu/, /no\s+vocal/]);
-  const mentionsVocal = includesAny(source, [/\bvocal/, /vokal/, /spev/, /hlas/]);
-
-  return {
-    source,
-    genres: matchingRules(source, GENRE_RULES),
-    language,
-    vocalGender,
-    vocalToneRules,
-    moodRules: matchingRules(source, MOOD_RULES),
-    bpm: parseBpm(source, input.bpm),
-    duration: Number.isFinite(input.duration) && input.duration && input.duration > 0 ? Math.round(input.duration) : undefined,
-    keyScale: input.keyScale,
-    timeSignature: input.timeSignature,
-    mustBeVocal: !instrumental && Boolean(language || vocalGender || vocalToneRules.length > 0 || mentionsVocal),
-    instrumental,
-  };
-}
-
-function buildIntentCaption(intent: ExtractedFormatIntent, originalCaption: string): string {
-  const parts: string[] = [];
-  const genrePhrase = intent.genres.length > 0
-    ? intent.genres.map(genre => genre.phrase).join(', blended with ')
-    : `music track based on this core user idea: "${originalCaption.trim()}"`;
-
-  parts.push(`A ${genrePhrase}.`);
-
-  if (intent.mustBeVocal) {
-    const vocalParts = [
-      ...intent.vocalToneRules.map(rule => rule.phrase),
-      intent.vocalGender ? `${intent.vocalGender} lead vocal` : 'lead vocal',
-      intent.language ? `in ${intent.language.label}` : '',
-    ].filter(Boolean);
-    parts.push(`Features ${vocalParts.join(', ')} with natural phrasing and clear presence in the mix.`);
-  } else if (intent.instrumental) {
-    parts.push('Instrumental arrangement with no lead vocal.');
-  }
-
-  if (intent.moodRules.length > 0) {
-    parts.push(`Mood and emotion: ${intent.moodRules.map(rule => rule.phrase).join(', ')}.`);
-  }
-
-  parts.push('Do not add unrelated genres, novelty sound effects, meme elements, or instrumentation that contradicts the user request.');
-  return parts.join(' ');
-}
-
-function buildSlovakIntentCaption(intent: ExtractedFormatIntent, originalCaption: string): string {
-  const parts: string[] = [];
-  const trimmedCaption = originalCaption.trim();
-  const genreText = intent.genres.length > 0
-    ? intent.genres.map(genre => genre.label).join(', ')
-    : trimmedCaption;
-
-  parts.push(`Vylepšený hudobný prompt podľa zadania: "${trimmedCaption}".`);
-  parts.push(`Zachovaj štýl: ${genreText}.`);
-
-  if (intent.mustBeVocal) {
-    const vocalParts = [
-      ...intent.vocalToneRules.map(rule => rule.label),
-      intent.vocalGender === 'female' ? 'ženský hlavný vokál' : intent.vocalGender === 'male' ? 'mužský hlavný vokál' : 'hlavný vokál',
-      intent.language?.code === 'sk' ? 'v slovenčine' : intent.language ? `v jazyku ${intent.language.label}` : '',
-    ].filter(Boolean);
-    parts.push(`Vokály: ${vocalParts.join(', ')} s prirodzeným frázovaním a jasným miestom v mixe.`);
-  } else if (intent.instrumental) {
-    parts.push('Inštrumentálna aranžmá bez hlavného vokálu.');
-  }
-
-  if (intent.moodRules.length > 0) {
-    parts.push(`Nálada: ${intent.moodRules.map(rule => rule.label).join(', ')}.`);
-  }
-
-  parts.push('Nepridávaj nesúvisiace žánre, meme prvky, novelty zvuky ani nástroje, ktoré odporujú zadaniu.');
-  return parts.join(' ');
-}
-
-function buildCzechIntentCaption(intent: ExtractedFormatIntent, originalCaption: string): string {
-  const parts: string[] = [];
-  const trimmedCaption = originalCaption.trim();
-  const genreText = intent.genres.length > 0
-    ? intent.genres.map(genre => genre.label).join(', ')
-    : trimmedCaption;
-
-  parts.push(`Vylepšený hudební prompt podle zadání: "${trimmedCaption}".`);
-  parts.push(`Zachovej styl: ${genreText}.`);
-
-  if (intent.mustBeVocal) {
-    const vocalParts = [
-      ...intent.vocalToneRules.map(rule => rule.label),
-      intent.vocalGender === 'female' ? 'ženský hlavní vokál' : intent.vocalGender === 'male' ? 'mužský hlavní vokál' : 'hlavní vokál',
-      intent.language?.code === 'cs' ? 'v češtině' : intent.language ? `v jazyce ${intent.language.label}` : '',
-    ].filter(Boolean);
-    parts.push(`Vokály: ${vocalParts.join(', ')} s přirozeným frázováním a jasným místem v mixu.`);
-  } else if (intent.instrumental) {
-    parts.push('Instrumentální aranžmá bez hlavního vokálu.');
-  }
-
-  if (intent.moodRules.length > 0) {
-    parts.push(`Nálada: ${intent.moodRules.map(rule => rule.label).join(', ')}.`);
-  }
-
-  parts.push('Nepřidávej nesouvisející žánry, meme prvky, novelty zvuky ani nástroje, které odporují zadání.');
-  return parts.join(' ');
-}
-
-function buildLocalizedIntentCaption(intent: ExtractedFormatIntent, originalCaption: string, language: CaptionOutputLanguage): string {
-  if (language === 'sk') return buildSlovakIntentCaption(intent, originalCaption);
-  if (language === 'cs') return buildCzechIntentCaption(intent, originalCaption);
-  return buildIntentCaption(intent, originalCaption);
-}
-
-function looksLikeEnglishCaption(caption: string): boolean {
-  const normalized = normalizeIntentText(caption);
-  return includesAny(normalized, [
-    /\b(song|track|with|features|female|male|vocals|lead vocal|clear presence|mix|mood|emotion|tempo|target duration|do not add|unrelated genres)\b/,
-  ]);
-}
-
-function intentViolations(intent: ExtractedFormatIntent, result: GeminiFormatResult): string[] {
-  const caption = normalizeIntentText(result.caption || '');
-  const violations: string[] = [];
-
-  for (const genre of intent.genres) {
-    const genrePresent = includesAny(caption, genre.patterns);
-    if (!genrePresent) violations.push(`missing genre: ${genre.label}`);
-
-    for (const conflict of genre.conflicts || []) {
-      if (conflict.test(caption) && !conflict.test(intent.source)) {
-        violations.push(`conflicting style for ${genre.label}`);
-        break;
-      }
-    }
-  }
-
-  if (intent.language) {
-    const languagePresent = includesAny(caption, intent.language.patterns) || result.vocal_language === intent.language.code;
-    if (!languagePresent) violations.push(`missing language: ${intent.language.label}`);
-  }
-
-  if (intent.vocalGender === 'female' && !includesAny(caption, [/female/, /woman/, /women/, /zensky/, /zensk/])) {
-    violations.push('missing female vocal');
-  }
-
-  if (intent.vocalGender === 'male' && !includesAny(caption, [/male/, /man/, /men/, /muzsk/, /muzsky/, /chlapsk/])) {
-    violations.push('missing male vocal');
-  }
-
-  for (const tone of intent.vocalToneRules) {
-    if (!includesAny(caption, tone.patterns)) violations.push(`missing vocal tone: ${tone.label}`);
-  }
-
-  for (const mood of intent.moodRules) {
-    if (!includesAny(caption, mood.patterns)) violations.push(`missing mood: ${mood.label}`);
-  }
-
-  if (intent.mustBeVocal && includesAny(caption, [/\binstrumental\b/, /no\s+vocal/, /without\s+vocals/])) {
-    violations.push('turned vocal request into instrumental');
-  }
-
-  if (intent.bpm && result.bpm && Math.abs(result.bpm - intent.bpm) > 4) {
-    violations.push('changed requested BPM');
-  }
-
-  return violations;
-}
-
-function preserveExplicitFormatIntent(input: GeminiFormatInput, result: GeminiFormatResult): GeminiFormatResult {
-  const intent = extractFormatIntent(input);
-  const violations = intentViolations(intent, result);
-  const captionLanguage = inferCaptionOutputLanguage(input);
-  let caption = result.caption || input.caption;
-
-  if (violations.length > 0 || (captionLanguage !== 'en' && looksLikeEnglishCaption(caption))) {
-    caption = buildLocalizedIntentCaption(intent, input.caption, captionLanguage);
-  }
-
-  return {
-    ...result,
-    caption,
-    bpm: intent.bpm ?? result.bpm,
-    duration: intent.duration ?? result.duration,
-    key_scale: intent.keyScale ?? result.key_scale,
-    time_signature: intent.timeSignature ?? result.time_signature,
-    vocal_language: intent.language?.code ?? result.vocal_language,
-  };
-}
 
 async function formatWithOpenAI(input: GeminiFormatInput): Promise<GeminiFormatResult | null> {
   const apiKey = config.openai.apiKey;
@@ -904,21 +575,6 @@ interface GenerateBody {
   strictMode?: boolean;
 }
 
-type LockedGenerationConstraints = {
-  styleProfile?: string;
-  genres: string[];
-  language?: string;
-  vocalGender?: 'male' | 'female';
-  vocalTone: string[];
-  mood: string[];
-  bpm?: number;
-  bpmRange?: [number, number];
-  duration?: number;
-  keyScale?: string;
-  timeSignature?: string;
-  instrumental: boolean;
-};
-
 type CompiledGenerateBody = GenerateBody & {
   lockedConstraints?: LockedGenerationConstraints;
   promptCompiler?: {
@@ -926,39 +582,10 @@ type CompiledGenerateBody = GenerateBody & {
     originalCaption: string;
     compiledCaption: string;
     lockedConstraints: LockedGenerationConstraints;
+    provider: string;
+    warnings: string[];
   };
 };
-
-function hasExplicitGenerationIntent(intent: ExtractedFormatIntent): boolean {
-  return Boolean(
-    intent.genres.length > 0 ||
-    intent.language ||
-    intent.vocalGender ||
-    intent.vocalToneRules.length > 0 ||
-    intent.moodRules.length > 0 ||
-    intent.bpm ||
-    intent.duration ||
-    intent.keyScale ||
-    intent.timeSignature ||
-    intent.instrumental ||
-    intent.mustBeVocal
-  );
-}
-
-function buildLockedConstraints(intent: ExtractedFormatIntent): LockedGenerationConstraints {
-  return {
-    genres: intent.genres.map(rule => rule.label),
-    language: intent.language?.code,
-    vocalGender: intent.vocalGender,
-    vocalTone: intent.vocalToneRules.map(rule => rule.label),
-    mood: intent.moodRules.map(rule => rule.label),
-    bpm: intent.bpm,
-    duration: intent.duration,
-    keyScale: intent.keyScale,
-    timeSignature: intent.timeSignature,
-    instrumental: intent.instrumental,
-  };
-}
 
 function defaultModelForPreset(preset: GenerateBody['modelPreset']): string {
   if (preset === 'fast') return 'acestep-v15-turbo';
@@ -966,11 +593,11 @@ function defaultModelForPreset(preset: GenerateBody['modelPreset']): string {
   return 'acestep-v15-sft';
 }
 
-function compileGenerationParams(input: GenerateBody): CompiledGenerateBody {
+async function compileGenerationParams(input: GenerateBody): Promise<CompiledGenerateBody> {
   const captionSource = (input.customMode ? (input.style || input.songDescription || '') : (input.songDescription || input.style || '')).trim();
   const lyricsSource = input.lyrics || '';
   const compilerCaption = captionSource || lyricsSource;
-  const intent = extractFormatIntent({
+  const constraints: PromptConstraints = await extractPromptConstraints({
     caption: compilerCaption,
     lyrics: lyricsSource,
     bpm: input.bpm,
@@ -978,31 +605,21 @@ function compileGenerationParams(input: GenerateBody): CompiledGenerateBody {
     keyScale: input.keyScale,
     timeSignature: input.timeSignature,
   });
-  const styleProfile = findStyleProfile(compilerCaption);
-  const strictMode = Boolean(input.strictMode || hasExplicitGenerationIntent(intent));
-  const captionLanguage = inferCaptionOutputLanguage({ caption: compilerCaption, lyrics: lyricsSource });
-  const baseCompiledCaption = strictMode && compilerCaption
-    ? buildLocalizedIntentCaption(intent, compilerCaption, captionLanguage)
-    : captionSource;
-  const profilePrompt = styleProfile ? buildStyleProfilePrompt(styleProfile) : '';
-  const compiledCaption = profilePrompt
-    ? `${profilePrompt} ${baseCompiledCaption || compilerCaption}`.trim()
-    : baseCompiledCaption;
-  const lockedConstraints = buildLockedConstraints(intent);
-  const effectiveBpm = intent.bpm ?? input.bpm ?? styleProfile?.defaultBpm;
-  const effectiveKeyScale = intent.keyScale || input.keyScale || styleProfile?.defaultKeyScale;
-  const effectiveTimeSignature = intent.timeSignature || input.timeSignature || styleProfile?.timeSignature;
-  const effectivePreset = input.modelPreset || styleProfile?.preferredPreset || 'quality';
-  const explicitMetadata = Boolean(effectiveBpm || intent.duration || effectiveKeyScale || effectiveTimeSignature);
-  const compiledInstrumental = intent.mustBeVocal ? false : Boolean(input.instrumental || intent.instrumental);
-  lockedConstraints.styleProfile = styleProfile?.id;
+  const styleProfile = findStyleProfile(`${compilerCaption} ${constraints.explicit.genres.join(' ')}`);
+  const strictMode = Boolean(input.strictMode || hasExplicitGenerationIntent(constraints));
+  const compiledCaption = constraints.stylePrompt || captionSource;
+  const lockedConstraints = buildLockedConstraints(constraints, styleProfile);
+  const effectiveBpm = constraints.explicit.bpm ?? input.bpm ?? constraints.inferred.bpm ?? styleProfile?.defaultBpm;
+  const effectiveKeyScale = constraints.explicit.keyScale || input.keyScale || constraints.inferred.keyScale || styleProfile?.defaultKeyScale;
+  const effectiveTimeSignature = constraints.explicit.timeSignature || input.timeSignature || constraints.inferred.timeSignature || styleProfile?.timeSignature;
+  const effectivePreset = input.modelPreset || constraints.inferred.preset || styleProfile?.preferredPreset || 'quality';
+  const explicitMetadata = Boolean(effectiveBpm || constraints.explicit.duration || effectiveKeyScale || effectiveTimeSignature);
+  const compiledInstrumental = constraints.explicit.mustBeVocal ? false : Boolean(input.instrumental || constraints.explicit.instrumental);
   lockedConstraints.bpm = effectiveBpm;
-  lockedConstraints.bpmRange = styleProfile?.bpmRange;
   lockedConstraints.keyScale = effectiveKeyScale;
   lockedConstraints.timeSignature = effectiveTimeSignature;
   lockedConstraints.instrumental = compiledInstrumental;
-  const preset = effectivePreset;
-  const ditModel = input.ditModel || defaultModelForPreset(preset);
+  const ditModel = input.ditModel || defaultModelForPreset(effectivePreset);
   const turboModel = ditModel.includes('turbo');
 
   return {
@@ -1011,18 +628,18 @@ function compileGenerationParams(input: GenerateBody): CompiledGenerateBody {
     style: input.customMode ? (compiledCaption || input.style) : (input.style || compiledCaption),
     lyrics: lyricsSource,
     instrumental: compiledInstrumental,
-    vocalLanguage: intent.language?.code || input.vocalLanguage,
-    duration: intent.duration ?? input.duration,
+    vocalLanguage: constraints.explicit.language || input.vocalLanguage,
+    duration: constraints.explicit.duration ?? input.duration,
     bpm: effectiveBpm,
     keyScale: effectiveKeyScale,
     timeSignature: effectiveTimeSignature,
     useCotMetas: explicitMetadata ? false : input.useCotMetas,
     useCotCaption: strictMode ? false : input.useCotCaption,
-    useCotLanguage: intent.language ? false : input.useCotLanguage,
+    useCotLanguage: constraints.explicit.language ? false : input.useCotLanguage,
     ditModel,
     inferenceSteps: input.inferenceSteps ?? (turboModel ? 8 : 50),
     guidanceScale: input.guidanceScale ?? (turboModel ? 1 : 8),
-    useAdg: input.useAdg ?? (preset === 'advanced' && ditModel.includes('base')),
+    useAdg: input.useAdg ?? (effectivePreset === 'advanced' && ditModel.includes('base')),
     strictMode,
     lockedConstraints,
     promptCompiler: {
@@ -1030,6 +647,8 @@ function compileGenerationParams(input: GenerateBody): CompiledGenerateBody {
       originalCaption: captionSource,
       compiledCaption,
       lockedConstraints,
+      provider: constraints.provider,
+      warnings: constraints.warnings,
     },
   };
 }
@@ -1163,7 +782,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
       return;
     }
 
-    const params = compileGenerationParams({
+    const params = await compileGenerationParams({
       customMode,
       songDescription,
       lyrics,
@@ -1709,9 +1328,10 @@ router.get('/models', async (_req, res: Response) => {
 });
 
 // GET /api/generate/random-description — Load a random simple description from Gradio
-router.get('/random-description', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
+router.get('/random-description', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const locale = typeof req.query.lang === 'string' ? req.query.lang : req.acceptsLanguages(['sk', 'en']) || 'en';
   try {
-    const randomDescription = await resolveGradioRandomDescription();
+    const randomDescription = await resolveGradioRandomDescription(locale);
     const payload = {
       description: randomDescription.description,
       instrumental: randomDescription.instrumental,
@@ -1723,7 +1343,7 @@ router.get('/random-description', authMiddleware, async (_req: AuthenticatedRequ
     }
     res.json(payload);
   } catch (error) {
-    const fallback = getRandomDescriptionFallback();
+    const fallback = getRandomDescriptionFallback(locale);
     console.error('Random description error:', error);
     res.json({
       description: fallback.description,

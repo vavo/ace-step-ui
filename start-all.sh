@@ -1,5 +1,5 @@
 #!/bin/bash
-# ACE-Step UI Complete Startup Script for Linux/macOS
+# GetMUSIC Complete Startup Script for Linux/macOS
 # Starts ACE-Step API + Backend + Frontend
 
 set -e

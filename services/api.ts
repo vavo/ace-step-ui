@@ -513,11 +513,11 @@ export const generateApi = {
   }> => api('/api/generate/format', { method: 'POST', body: params, token }),
 
   // Random description from Gradio's example library
-  getRandomDescription: (token: string): Promise<{
+  getRandomDescription: (token: string, language = 'en'): Promise<{
     description: string;
     instrumental: boolean;
     vocalLanguage: string;
-  }> => api('/api/generate/random-description', { token }),
+  }> => api(`/api/generate/random-description?lang=${encodeURIComponent(language)}`, { token }),
 
   // LoRA Inference (requires ACE-Step training fork)
   loadLora: (params: {

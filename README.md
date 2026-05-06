@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/🎵-ACE--Step_UI-ff69b4?style=for-the-badge&labelColor=1a1a1a" alt="ACE-Step UI" height="60">
+  <img src="https://img.shields.io/badge/🎵-ACE--Step_UI-ff69b4?style=for-the-badge&labelColor=1a1a1a" alt="GetMUSIC" height="60">
 </p>
 
-<h1 align="center">ACE-Step UI</h1>
+<h1 align="center">GetMUSIC</h1>
 
 <p align="center">
   <strong>The Ultimate Open Source Suno Alternative</strong><br>
@@ -46,9 +46,7 @@
   </a>
 </p>
 
-<p align="center">
-  <img src="docs/demo.gif" alt="ACE-Step UI - Open Source Suno Alternative" width="100%">
-</p>
+
 
 <p align="center">
   <em>Generate professional AI music with a Spotify-like interface - 100% free and local</em>
@@ -56,11 +54,11 @@
 
 ---
 
-## 🚀 Why ACE-Step UI?
+## 🚀 Why GetMUSIC?
 
-**Tired of paying $10+/month for Suno or Udio?** ACE-Step 1.5 is the **open source Suno killer** that runs locally on your own GPU - and ACE-Step UI gives you a **beautiful, professional interface** to harness its full power.
+**Tired of paying $10+/month for Suno or Udio?** ACE-Step 1.5 is the **open source Suno killer** that runs locally on your own GPU - and GetMUSIC gives you a **beautiful, professional interface** to harness its full power.
 
-| Feature | Suno/Udio | ACE-Step UI |
+| Feature | Suno/Udio | GetMUSIC |
 |---------|-----------|-------------|
 | **Cost** | $10-50/month | **FREE forever** |
 | **Privacy** | Cloud-based | **100% local** |
@@ -157,17 +155,6 @@ Python helper scripts in this repository run inside the ACE-Step Python environm
 
 ## ⚡ Quick Start
 
-### 🎯 Pinokio - 1-Click Install (Recommended for All Users!)
-
-The easiest way to get ACE-Step UI up and running without manual terminal setup:
-
-<p align="center">
-  <a href="https://beta.pinokio.co/apps/github-com-cocktailpeanut-ace-step-ui-pinokio">
-    <img src="https://img.shields.io/badge/⚡_Install_with_Pinokio-One_Click-ff69b4?style=for-the-badge&labelColor=1a1a1a" alt="Install with Pinokio" height="50">
-  </a>
-</p>
-
-> **[Pinokio](https://pinokio.computer)** handles everything automatically: Python, Node.js, dependencies, model downloads, and launching. Just click install and start making music.
 
 ---
 
@@ -192,7 +179,7 @@ cd ace-step-ui
 cd /path/to/ACE-Step-1.5
 uv run acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
 
-# 2. Start ACE-Step UI (in another terminal)
+# 2. Start GetMUSIC (in another terminal)
 cd ace-step-ui
 ./start.sh
 ```
@@ -281,7 +268,7 @@ uv pip install -e .
 cd ..
 ```
 
-### 2. Install ACE-Step UI (This Repository)
+### 2. Install GetMUSIC (This Repository)
 
 #### Linux / macOS
 ```bash
@@ -322,7 +309,7 @@ uv run acestep --port 8001 --enable-api --backend pt --server-name 127.0.0.1
 
 Wait for "API endpoints enabled" before proceeding.
 
-### Step 2: Start ACE-Step UI
+### Step 2: Start GetMUSIC
 
 **Linux / macOS:**
 ```bash
@@ -429,7 +416,7 @@ Full control over every parameter:
 
 ## 🤝 Contributing
 
-**We need your help to make ACE-Step UI even better!**
+**We need your help to make GetMUSIC even better!**
 
 This is a community-driven project and contributions are what make open source amazing. Whether you're fixing bugs, adding features, improving documentation, or sharing ideas - every contribution counts!
 
@@ -491,7 +478,7 @@ This project is open source under the [MIT License](LICENSE).
 ---
 
 <p align="center">
-  <strong>⭐ If ACE-Step UI helps you create amazing music, please star this repo! ⭐</strong>
+  <strong>⭐ If GetMUSIC helps you create amazing music, please star this repo! ⭐</strong>
 </p>
 
 <p align="center">

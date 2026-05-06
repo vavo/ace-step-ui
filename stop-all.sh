@@ -1,5 +1,5 @@
 #!/bin/bash
-# ACE-Step UI Stop All Services Script
+# GetMUSIC Stop All Services Script
 
 echo "Stopping all ACE-Step services..."
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# ACE-Step UI Startup Script for RunPod
+# GetMUSIC Startup Script for RunPod
 # Starts ACE-Step API (internal) + Express (external port 4444)
 
 set -e
@@ -15,7 +15,7 @@ fi
 PORT="${PORT:-4444}"
 
 echo "=================================="
-echo "  ACE-Step UI - RunPod Startup"
+echo "  GetMUSIC - RunPod Startup"
 echo "=================================="
 echo
 

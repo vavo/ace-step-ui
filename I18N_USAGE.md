@@ -1,4 +1,4 @@
-# ACE-Step UI — Internationalization Guide
+# GetMUSIC — Internationalization Guide
 
 ## Overview
 

@@ -190,5 +190,5 @@ export interface UserProfile {
   };
 }
 
-// Simplified views for ACE-Step UI
+// Simplified views for GetMUSIC
 export type View = 'create' | 'feed' | 'ideas' | 'leaderboard' | 'library' | 'training' | 'profile' | 'song' | 'playlist' | 'search';

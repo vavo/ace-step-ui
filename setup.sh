@@ -1,10 +1,10 @@
 #!/bin/bash
-# ACE-Step UI Setup Script
+# GetMUSIC Setup Script
 
 set -e
 
 echo "=================================="
-echo "  ACE-Step UI Setup"
+echo "  GetMUSIC Setup"
 echo "=================================="
 
 # Check if ACE-Step exists
@@ -38,7 +38,7 @@ ACESTEP_PATH=$(cd "$ACESTEP_PATH" && pwd)
 # Create .env file
 echo "Creating .env file..."
 cat > .env << EOF
-# ACE-Step UI Configuration
+# GetMUSIC Configuration
 
 # Server
 PORT=3001

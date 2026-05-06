@@ -157,7 +157,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   onAudioSelectionApplied,
 }) => {
   const { isAuthenticated, token, user } = useAuth();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   // Randomly select 6 music tags from MAIN_STYLES
   const [musicTags, setMusicTags] = useState<string[]>(() => {
@@ -1513,7 +1513,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                     onClick={async () => {
                       if (!token) return;
                       try {
-                        const result = await generateApi.getRandomDescription(token);
+                        const result = await generateApi.getRandomDescription(token, language);
                         setSongDescription(result.description);
                         setInstrumental(result.instrumental);
                         updateVocalLanguage(result.vocalLanguage || 'unknown');

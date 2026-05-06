@@ -176,7 +176,7 @@ app.use('/demucs-web', (req, res, next) => {
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'ACE-Step UI API' });
+  res.json({ status: 'ok', service: 'GetMUSIC API' });
 });
 
 // oEmbed endpoint for rich embeds
@@ -212,7 +212,7 @@ app.get('/api/oembed', async (req, res) => {
     res.json({
       version: '1.0',
       type: 'rich',
-      provider_name: 'ACE-Step UI',
+      provider_name: 'GetMUSIC',
       provider_url: config.frontendUrl,
       title: song.title,
       author_name: song.creator,
@@ -260,7 +260,7 @@ app.get('/song/:id', async (req, res) => {
     const song = result.rows[0];
     const coverUrl = song.cover_url || `https://picsum.photos/seed/${song.id}/1200/630`;
     const title = `${song.title} by ${song.creator}`;
-    const description = `🎵 ${song.style} • Create your own AI music free on ACE-Step UI`;
+    const description = `🎵 ${song.style} • Create your own AI music free on GetMUSIC`;
     const pageUrl = `${config.frontendUrl}/song/${song.id}`;
 
     res.send(`<!DOCTYPE html>
@@ -268,7 +268,7 @@ app.get('/song/:id', async (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} | ACE-Step UI</title>
+  <title>${title} | GetMUSIC</title>
   <meta name="title" content="${title}">
   <meta name="description" content="${description}">
   <meta property="og:type" content="music.song">
@@ -276,7 +276,7 @@ app.get('/song/:id', async (req, res) => {
   <meta property="og:title" content="${title}">
   <meta property="og:description" content="${description}">
   <meta property="og:image" content="${coverUrl}">
-  <meta property="og:site_name" content="ACE-Step UI">
+  <meta property="og:site_name" content="GetMUSIC">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${title}">
   <meta name="twitter:description" content="${description}">
@@ -284,7 +284,7 @@ app.get('/song/:id', async (req, res) => {
   <meta http-equiv="refresh" content="0;url=${config.frontendUrl}?song=${song.id}">
 </head>
 <body>
-  <p>Redirecting to <a href="${config.frontendUrl}?song=${song.id}">ACE-Step UI</a>...</p>
+  <p>Redirecting to <a href="${config.frontendUrl}?song=${song.id}">GetMUSIC</a>...</p>
 </body>
 </html>`);
   } catch (error) {
@@ -515,7 +515,7 @@ cron.schedule('0 3 * * *', async () => {
 
 // Start server on all interfaces for LAN access
 app.listen(config.port, '0.0.0.0', () => {
-  console.log(`ACE-Step UI Server running on http://localhost:${config.port}`);
+  console.log(`GetMUSIC Server running on http://localhost:${config.port}`);
   console.log(`Environment: ${config.nodeEnv}`);
   console.log(`ACE-Step API: ${config.acestep.apiUrl}`);
 
