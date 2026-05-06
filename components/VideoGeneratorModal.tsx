@@ -3,8 +3,8 @@ import { Song } from '../types';
 import { X, Play, Pause, Download, Wand2, Image as ImageIcon, Music, Video, Loader2, Palette, Layers, Zap, Type, Monitor, Aperture, Activity, Circle, Grid, Box, BarChart2, Waves, Disc, Upload, Plus, Trash2, Settings2, MousePointer2, Search, ExternalLink, Sun, Film, Minus } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-import ffmpegCoreUrl from '@ffmpeg/core?url';
-import ffmpegWasmUrl from '@ffmpeg/core/wasm?url';
+import ffmpegCoreUrl from '../node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js?url';
+import ffmpegWasmUrl from '../node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm?url';
 import { useResponsive } from '../context/ResponsiveContext';
 import { useI18n } from '../context/I18nContext';
 
