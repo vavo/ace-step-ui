@@ -119,6 +119,15 @@ app.use(cors(corsOptionsDelegate));
 
 app.use(express.json());
 
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.setHeader('Vary', 'Origin, Cookie, Authorization');
+  next();
+});
+
 // Proxy ACE-Step API requests
 app.use('/acestep-api', createProxyMiddleware({
   target: config.acestep.apiUrl,
