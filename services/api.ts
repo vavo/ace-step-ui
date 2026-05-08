@@ -187,7 +187,7 @@ export const authApi = {
     api('/api/auth/me', { token: token || undefined }),
 
   session: (): Promise<SessionResponse> =>
-    api('/api/auth/session'),
+    api(`/api/auth/session?t=${Date.now()}`),
 
   logout: (token?: string | null): Promise<{ success: boolean }> =>
     api('/api/auth/logout', { method: 'POST', token: token || undefined }),
