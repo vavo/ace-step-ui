@@ -186,13 +186,13 @@ export const IdeasPage: React.FC = () => {
               onAction={createIdea}
             />
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col items-stretch justify-start gap-2">
               {ideas.map((idea) => (
                 <button
                   key={idea.id}
                   type="button"
                   onClick={() => selectIdea(idea)}
-                  className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                  className={`block min-h-[72px] w-full shrink-0 rounded-lg border p-3 text-left transition-colors ${
                     idea.id === selectedId
                       ? 'border-pink-500/70 bg-pink-500/10'
                       : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-white/10 dark:bg-zinc-900/50 dark:hover:border-white/20'
