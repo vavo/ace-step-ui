@@ -11,7 +11,7 @@ interface AuthContextType {
   registerWithEmail: (email: string, password: string, username: string) => Promise<void>;
   startGoogleLogin: () => void;
   updateUsername: (username: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -87,13 +87,19 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     setToken(newToken);
   }, [token]);
 
-  const logout = useCallback((): void => {
-    authApi.logout().catch(() => {});
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      await authApi.logout(token);
+    } catch (error) {
+      console.error('Logout failed:', error);
+      return;
+    }
+
     setUser(null);
     setToken(null);
     localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.removeItem(LEGACY_USER_KEY);
-  }, []);
+  }, [token]);
 
   const refreshUser = useCallback(async (): Promise<void> => {
     try {

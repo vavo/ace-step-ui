@@ -10,7 +10,7 @@ interface SidebarProps {
   onToggleTheme: () => void;
   user?: { username: string; isAdmin?: boolean; avatar_url?: string } | null;
   onLogin?: () => void;
-  onLogout?: () => void;
+  onLogout?: () => void | Promise<void>;
   onOpenSettings?: () => void;
   isOpen?: boolean;
   onToggle?: () => void;
@@ -176,7 +176,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
               {/* Logout */}
               <button
-                onClick={onLogout}
+                onClick={() => { void onLogout?.(); }}
                 className={`
                   w-full rounded-xl flex items-center gap-3 transition-all duration-200 text-zinc-500 hover:text-red-500 hover:bg-red-500/10
                   ${isOpen ? 'px-3 py-2.5 justify-start' : 'aspect-square justify-center'}

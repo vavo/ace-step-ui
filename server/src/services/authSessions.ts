@@ -30,12 +30,18 @@ export const userSelectFields = [
   'created_at',
 ].join(', ');
 
-function cookieOptions(maxAgeMs: number) {
+function baseCookieOptions() {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
     secure: config.nodeEnv === 'production',
     path: '/',
+  };
+}
+
+function cookieOptions(maxAgeMs: number) {
+  return {
+    ...baseCookieOptions(),
     maxAge: maxAgeMs,
   };
 }
@@ -114,10 +120,28 @@ export async function createSession(res: Response, userId: string): Promise<stri
 
 export async function clearSession(req: Request, res: Response): Promise<void> {
   const token = readCookie(req, SESSION_COOKIE);
-  if (token) {
-    await pool.query('DELETE FROM auth_sessions WHERE token_hash = ?', [hashToken(token)]);
+  const tokenHash = token ? hashToken(token) : null;
+  let bearerUserId: string | null = null;
+  try {
+    bearerUserId = readBearerUser(req)?.id ?? null;
+  } catch {
+    bearerUserId = null;
   }
-  res.clearCookie(SESSION_COOKIE, { path: '/' });
+
+  if (bearerUserId) {
+    await pool.query('DELETE FROM auth_sessions WHERE user_id = ?', [bearerUserId]);
+  } else if (tokenHash) {
+    await pool.query(
+      `DELETE FROM auth_sessions
+       WHERE token_hash = ?
+          OR user_id = (
+            SELECT user_id FROM auth_sessions WHERE token_hash = ? LIMIT 1
+          )`,
+      [tokenHash, tokenHash]
+    );
+  }
+
+  res.clearCookie(SESSION_COOKIE, baseCookieOptions());
 }
 
 export async function readSessionUser(req: Request): Promise<AuthenticatedUser | null> {

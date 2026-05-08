@@ -686,7 +686,7 @@ router.patch('/username', authMiddleware, async (req: AuthenticatedRequest, res:
   }
 });
 
-// Logout (no-op for local app, just for API compatibility)
+// Logout current browser session; with an access token, revoke all sessions for the user.
 router.post('/logout', async (_req: Request, res: Response) => {
   await clearSession(_req, res);
   res.json({ success: true });
